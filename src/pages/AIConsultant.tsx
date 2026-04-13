@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { Send, Camera, Loader2, Snowflake, Sun, Shield, Bot, User, Sparkles, MessageCircle, Zap, ArrowRight, Download, Trash2, X, Image as ImageIcon, Search, BookOpen, PenLine } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useLanguage } from '../context/LanguageContext'
-import { chatWithAIStream, analyzeImageStream, repairStructuredOutput, fetchDataHubResearch, type DataHubResearchPayload, type Message as AIMessage, type AssistantPhase } from '../services/aiService'
+import { chatWithAIStream, analyzeImageStream, fetchDataHubResearch, type DataHubResearchPayload, type Message as AIMessage, type AssistantPhase } from '../services/aiService'
 import { parseAreaFromText, computeCarbonProfile, computeCostSummary } from '../utils/analytics'
 import { buildLocalKnowledgePromptContext } from '../data/localKnowledgePacks'
 import { buildNew10ResearchPromptContext, detectNew10ResearchEntry, NEW10_RESEARCH_BY_ID } from '../data/new10ResearchData'
@@ -15,6 +15,7 @@ interface Message {
   image?: string // base64 data URL for display
   citations?: SourceItem[]
   complianceHints?: ComplianceHint[]
+  validation?: TemplateValidationResult
 }
 
 interface SiteProfile {
@@ -99,6 +100,12 @@ const extractMarkdownHeadings = (content: string): string[] => {
 }
 
 const getTemplateSections = (templateMode: ResponseTemplateMode, audienceMode: AudienceMode, lang: 'zh' | 'en'): TemplateSectionSpec[] => {
+  // Public mode: no forced headings, use style guidance only
+  if (audienceMode === 'public') {
+    return []
+  }
+
+  // Engineer mode: strict structured templates
   if (templateMode === 'building') {
     return lang === 'zh'
       ? [
@@ -131,10 +138,7 @@ const getTemplateSections = (templateMode: ResponseTemplateMode, audienceMode: A
         ]
   }
 
-  if (audienceMode === 'public') {
-    return []
-  }
-
+  // consultation + engineer
   return lang === 'zh'
     ? [
         { title: '假设条件', aliases: ['假设条件', '假设'] },
@@ -159,11 +163,24 @@ const getTemplateSections = (templateMode: ResponseTemplateMode, audienceMode: A
 const buildStructuredTemplateGuide = (templateMode: ResponseTemplateMode, audienceMode: AudienceMode, lang: 'zh' | 'en'): string => {
   const sections = getTemplateSections(templateMode, audienceMode, lang)
   if (sections.length === 0) {
+    // Public mode: natural style guidance, no forced headings
     if (lang === 'zh') {
-      return '回答风格要求（咨询方案 + 大众模式）：\n1) 先给出简短结论。\n2) 用2-4条要点给出可执行建议。\n3) 涉及费用时给出区间并标注为估算。\n4) 信息不足时明确假设并指出需补充数据。'
+      if (templateMode === 'building') {
+        return '回答风格要求（建筑问答 + 大众模式）：\n1) 用通俗易懂的语言介绍建筑。\n2) 重点说明气候适应智慧和现代借鉴价值。\n3) 适当量化（如节能百分比），但避免过多专业术语。\n4) 信息不足时明确说明。'
+      }
+      if (templateMode === 'consultation') {
+        return '回答风格要求（咨询方案 + 大众模式）：\n1) 先给出简短结论。\n2) 用2-4条要点给出可执行建议。\n3) 涉及费用时给出区间并标注为估算。\n4) 信息不足时明确假设并指出需补充数据。'
+      }
+      return '回答风格要求（大众模式）：\n1) 用自然、易懂的语言回答。\n2) 适当使用要点列表，但不强制使用固定标题。\n3) 涉及数据时给出估算区间。\n4) 信息不足时说明假设。'
     }
 
-    return 'Response style guidance (Consultation + Public mode):\n1) Start with a short conclusion.\n2) Provide 2-4 actionable recommendations as concise bullets.\n3) Use range-based estimates for cost-related advice and label them as estimates.\n4) If inputs are missing, state assumptions and specify what data is needed.'
+    if (templateMode === 'building') {
+      return 'Response style guidance (Building QA + Public mode):\n1) Introduce the building in plain, accessible language.\n2) Highlight climate-adaptation wisdom and modern relevance.\n3) Quantify where possible (e.g. energy savings %), but minimize jargon.\n4) State when information is incomplete.'
+    }
+    if (templateMode === 'consultation') {
+      return 'Response style guidance (Consultation + Public mode):\n1) Start with a short conclusion.\n2) Provide 2-4 actionable recommendations as concise bullets.\n3) Use range-based estimates for cost-related advice and label them as estimates.\n4) If inputs are missing, state assumptions and specify what data is needed.'
+    }
+    return 'Response style guidance (Public mode):\n1) Respond naturally in accessible language.\n2) Use bullet points when helpful, but no forced headings required.\n3) Provide range-based estimates for quantitative advice.\n4) State assumptions when data is incomplete.'
   }
 
   const headingList = sections
@@ -884,7 +901,16 @@ ${caseTable}
     return mappings
   }
 
+  const isCasualGreeting = (text: string): boolean => {
+    const normalized = text.trim().toLowerCase()
+    if (normalized.length > 30) return false
+    return /^(hi|hello|hey|greetings|good\s+(morning|afternoon|evening)|你好|嗨|您好|早上好|下午好|晚上好)[\s!.?]*$/i.test(normalized)
+  }
+
   const buildContextualPrompt = (rawInput: string, templateMode: ResponseTemplateMode): string => {
+    // For casual greetings, don't inject structured template metadata
+    if (isCasualGreeting(rawInput)) return rawInput
+
     const profileSummary = [
       siteProfile.city && `City: ${siteProfile.city}`,
       siteProfile.climateZone && `Climate Zone: ${siteProfile.climateZone}`,
@@ -1069,25 +1095,14 @@ ${caseTable}
         ? streamedAssistant
         : (lang === 'zh' ? '抱歉，我未生成有效回复。请重试。' : 'Sorry, I could not generate a valid response. Please try again.')
 
-      let validation = validateStructuredOutput(finalContent, templateMode, audienceMode, lang)
+      // Validation is informational only for engineer mode; public mode always passes
+      const skipValidation = isCasualGreeting(userText) || audienceMode === 'public'
+      const validation = skipValidation
+        ? { complete: true, missingTitles: [] }
+        : validateStructuredOutput(finalContent, templateMode, audienceMode, lang)
 
-      if (!validation.complete) {
-        const repairedContent = await repairStructuredOutput({
-          originalContent: finalContent,
-          templateMode,
-          audienceMode,
-          lang,
-          missingSections: validation.missingTitles,
-        })
-        const repairedValidation = validateStructuredOutput(repairedContent, templateMode, audienceMode, lang)
-        if (repairedValidation.complete) {
-          finalContent = repairedContent
-          validation = repairedValidation
-        } else {
-          finalContent = repairedContent || finalContent
-          validation = repairedValidation
-        }
-      }
+      // No repair loop — accept the AI's response as-is
+      // Missing sections are shown as informational badges in the UI
 
       if (assistantIndex !== null) {
         setMessages(prev => {
@@ -1098,6 +1113,7 @@ ${caseTable}
             content: finalContent,
             citations: citationSources.length > 0 ? citationSources : undefined,
             complianceHints: complianceHints.length > 0 ? complianceHints : undefined,
+            validation,
           }
           return next
         })

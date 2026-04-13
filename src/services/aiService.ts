@@ -36,7 +36,16 @@ function detectLangFromPrompt(text: string): SupportedLang {
   return detectLikelyChinese(text) ? 'zh' : 'en';
 }
 
+function isCasualGreeting(text: string): boolean {
+  const normalized = text.split(/\n\nAudience Mode:/i)[0].trim().toLowerCase();
+  if (normalized.length > 30) return false;
+  return /^(hi|hello|hey|greetings|good\s+(morning|afternoon|evening)|你好|嗨|您好|早上好|下午好|晚上好)[\s!.?]*$/i.test(normalized);
+}
+
 function detectTemplateModeFromPrompt(text: string): SupportedTemplateMode {
+  // Skip structured templates for casual greetings
+  if (isCasualGreeting(text)) return 'general';
+
   const modeMatch = text.match(/Template Mode:\s*(Building|Consultation|General)/i);
   if (modeMatch?.[1]) {
     const mode = modeMatch[1].toLowerCase();
@@ -99,78 +108,106 @@ function buildOfflineStructuredFallback(
 ): string {
   const intent = getUserIntentExcerpt(message) || (lang === 'zh' ? '建筑气候适应咨询' : 'architecture climate consultation');
 
+  // For casual greetings, return a natural friendly response
+  if (isCasualGreeting(message)) {
+    const greeting = lang === 'zh'
+      ? '你好！我是筑之千年 AI 建筑顾问，专注于中国传统建筑的气候适应智慧与可持续设计。你可以问我关于土楼、四合院、窑洞等传统建筑类型，或者咨询现代低碳建筑方案。'
+      : 'Hello! I\'m the ZHUZHI QIANNIAN AI architectural consultant, specializing in traditional Chinese building wisdom and sustainable design. Ask me about Tulou, Siheyuan, Yaodong, or any other traditional building types, or consult me on modern low-carbon design strategies.';
+    return includeSetupHint ? `${greeting}\n\n${getAuthSetupHint(lang)}` : greeting;
+  }
+
   if (templateMode === 'building') {
+    // Engineer mode: strict headings
+    if (audienceMode === 'engineer') {
+      const base = lang === 'zh'
+        ? [
+            '## 建筑概览',
+            `这是关于「${intent}」的离线识别与解读草案，结论用于前期判断。`,
+            '',
+            '## 气候适应特征',
+            '- 重点关注围护热惰性、通风路径与遮阳组织。',
+            '- 若有屋顶/院落信息，可进一步判断排雨与防风逻辑。',
+            '',
+            '## 现代应用建议',
+            '1. 保留原理，不照搬形式：传统做法 → 现代规范化构造。',
+            '2. 先做围护与通风，再做机电补偿，以降低运行碳。',
+            '3. 结合当地材料与施工能力，优先低碳可维护方案。',
+            '',
+            '## 置信度',
+            '置信度: Medium',
+          ].join('\n')
+        : [
+            '## Building Overview',
+            `This is an offline identification and interpretation draft for "${intent}", suitable for early-stage direction only.`,
+            '',
+            '## Climate Adaptation Features',
+            '- Focus on thermal mass, ventilation paths, and shading geometry.',
+            '- Roof and courtyard details can further confirm rain and wind adaptation logic.',
+            '',
+            '## Modern Application Ideas',
+            '1. Keep principles, not replicas: traditional logic → code-compliant modern assemblies.',
+            '2. Prioritize envelope and passive airflow before mechanical compensation to reduce operational carbon.',
+            '3. Align with local material supply and contractor capability for maintainable low-carbon delivery.',
+            '',
+            '## Confidence',
+            'Confidence: Medium',
+          ].join('\n');
+
+      return includeSetupHint ? `${base}\n\n${getAuthSetupHint(lang)}` : base;
+    }
+
+    // Public mode: natural language
     const base = lang === 'zh'
-      ? [
-          '## 建筑概览',
-          `这是关于「${intent}」的离线识别与解读草案，结论用于前期判断。`,
-          '',
-          '## 气候适应特征',
-          '- 重点关注围护热惰性、通风路径与遮阳组织。',
-          '- 若有屋顶/院落信息，可进一步判断排雨与防风逻辑。',
-          '',
-          '## 现代应用建议',
-          '1. 保留原理，不照搬形式：传统做法 → 现代规范化构造。',
-          '2. 先做围护与通风，再做机电补偿，以降低运行碳。',
-          '3. 结合当地材料与施工能力，优先低碳可维护方案。',
-          '',
-          '## 置信度',
-          '置信度: Medium',
-        ].join('\n')
-      : [
-          '## Building Overview',
-          `This is an offline identification and interpretation draft for "${intent}", suitable for early-stage direction only.`,
-          '',
-          '## Climate Adaptation Features',
-          '- Focus on thermal mass, ventilation paths, and shading geometry.',
-          '- Roof and courtyard details can further confirm rain and wind adaptation logic.',
-          '',
-          '## Modern Application Ideas',
-          '1. Keep principles, not replicas: traditional logic → code-compliant modern assemblies.',
-          '2. Prioritize envelope and passive airflow before mechanical compensation to reduce operational carbon.',
-          '3. Align with local material supply and contractor capability for maintainable low-carbon delivery.',
-          '',
-          '## Confidence',
-          'Confidence: Medium',
-        ].join('\n');
+      ? `关于「${intent}」，这是一种具有显著气候适应智慧的传统建筑类型。它通过厚重的围护结构（热惰性）、精心组织的通风路径和遮阳设计来应对当地气候。现代建筑可以借鉴这些被动式策略——例如利用热质量减少供暖能耗约30%，通过自然通风降低制冷需求。建议保留原理而非照搬形式，结合当地材料和施工能力选择低碳可维护方案。`
+      : `"${intent}" is a traditional building type with notable climate-adaptation wisdom. It responds to local climate through heavy thermal-mass walls, carefully organized ventilation paths, and shading geometry. Modern buildings can borrow these passive strategies — for example, using thermal mass to reduce heating energy by ~30%, and natural ventilation to cut cooling demand. The recommendation is to keep the principles, not replicate the form, and align with local material supply for maintainable low-carbon delivery.`;
 
     return includeSetupHint ? `${base}\n\n${getAuthSetupHint(lang)}` : base;
   }
 
   if (templateMode === 'general') {
+    // Engineer mode: strict headings
+    if (audienceMode === 'engineer') {
+      const base = lang === 'zh'
+        ? [
+            '## 直接回答',
+            `关于「${intent}」，当前可先给出离线版结论，作为后续细化前的参考。`,
+            '',
+            '## 关键依据',
+            '- 结合传统建筑被动策略：围护、通风、遮阳与排水。',
+            '- 在参数不完整时，建议先进行区间估算而非单点值承诺。',
+            '',
+            '## 建议下一步',
+            '1. 补充城市、面积、预算与目标性能。',
+            '2. 明确优先级：节能、舒适或韧性。',
+            '3. 进入下一轮带参数的方案比选。',
+            '',
+            '## 置信度',
+            '置信度: Medium',
+          ].join('\n')
+        : [
+            '## Direct Answer',
+            `For "${intent}", here is an offline-first conclusion that can guide your next design iteration.`,
+            '',
+            '## Key Points',
+            '- Reuse passive principles from vernacular architecture: envelope, airflow, shading, and water management.',
+            '- When inputs are incomplete, provide range-based estimates instead of single-point commitments.',
+            '',
+            '## Suggested Next Step',
+            '1. Provide city, area, budget, and target performance level.',
+            '2. Set a primary objective: energy, comfort, or resilience.',
+            '3. Proceed to a parameterized option comparison in the next round.',
+            '',
+            '## Confidence',
+            'Confidence: Medium',
+          ].join('\n');
+
+      return includeSetupHint ? `${base}\n\n${getAuthSetupHint(lang)}` : base;
+    }
+
+    // Public mode: natural language
     const base = lang === 'zh'
-      ? [
-          '## 直接回答',
-          `关于「${intent}」，当前可先给出离线版结论，作为后续细化前的参考。`,
-          '',
-          '## 关键依据',
-          '- 结合传统建筑被动策略：围护、通风、遮阳与排水。',
-          '- 在参数不完整时，建议先进行区间估算而非单点值承诺。',
-          '',
-          '## 建议下一步',
-          '1. 补充城市、面积、预算与目标性能。',
-          '2. 明确优先级：节能、舒适或韧性。',
-          '3. 进入下一轮带参数的方案比选。',
-          '',
-          '## 置信度',
-          '置信度: Medium',
-        ].join('\n')
-      : [
-          '## Direct Answer',
-          `For "${intent}", here is an offline-first conclusion that can guide your next design iteration.`,
-          '',
-          '## Key Points',
-          '- Reuse passive principles from vernacular architecture: envelope, airflow, shading, and water management.',
-          '- When inputs are incomplete, provide range-based estimates instead of single-point commitments.',
-          '',
-          '## Suggested Next Step',
-          '1. Provide city, area, budget, and target performance level.',
-          '2. Set a primary objective: energy, comfort, or resilience.',
-          '3. Proceed to a parameterized option comparison in the next round.',
-          '',
-          '## Confidence',
-          'Confidence: Medium',
-        ].join('\n');
+      ? `关于「${intent}」，传统建筑的被动策略（围护、通风、遮阳与排水）仍然值得现代借鉴。当参数不完整时，建议先进行区间估算而非单点值承诺。下一步可以补充城市、面积、预算与目标性能，明确优先级（节能、舒适或韧性），然后进入更详细的方案比选。`
+      : `For "${intent}", passive strategies from vernacular architecture (envelope, airflow, shading, and water management) remain highly relevant today. When inputs are incomplete, range-based estimates are more reliable than single-point values. Next step: provide city, area, budget, and target performance, then choose a primary objective (energy, comfort, or resilience) for a more detailed comparison.`;
 
     return includeSetupHint ? `${base}\n\n${getAuthSetupHint(lang)}` : base;
   }
