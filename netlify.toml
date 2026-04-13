@@ -1,5 +1,4 @@
 [build]
-  base = "zhuzhi-qiannian"
   publish = "dist"
   command = "npm run build"
 
