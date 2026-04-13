@@ -27,7 +27,7 @@ dist-ssr
 *.sw?
 
 # Large binary files (models, videos, images)
-public/models/
-public/videos/
-public/images/
-public/data/
+# public/models/   -- uploading in batches
+# public/videos/   -- uploading in batches
+# public/images/   -- uploading in batches
+# public/data/     -- uploading in batches
