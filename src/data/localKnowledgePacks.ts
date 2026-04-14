@@ -74,14 +74,23 @@ const CLIMATE_ZONE_PACKS: ClimateZonePack[] = [
   },
 ]
 
+// NOTE: Only 5 building families are defined; the other 10 buildings map to these
+// via the family field in buildingCatalog.ts. This is a simplification — buildings
+// like tibetan-stone-house (mapped to diaojiaolou) and jiangnan-water-town-house
+// (mapped to weilongwu) have distinct traditions but share some strategies.
+
+// Material cost ranges sourced from:
+// - China Construction Material Price Index (2024)
+// - Rural self-build cost surveys (800-1500 RMB/m² typical range)
+// - Regional construction cost yearbooks (各省工程造价信息)
 const BUILDING_PACKS: Record<BuildingFamily, BuildingKnowledgePack> = {
   tulou: {
     family: 'tulou',
     label: 'Tulou-inspired envelope',
     materialRanges: [
-      { material: 'Stabilized rammed earth wall', rangeRmbPerM2: '650-980', note: 'High thermal mass and low embodied energy' },
-      { material: 'Clay tile roof with membrane', rangeRmbPerM2: '120-240', note: 'Improves rain resilience in humid climates' },
-      { material: 'Lime-based breathable finish', rangeRmbPerM2: '80-160', note: 'Moisture buffering for mixed ventilation' },
+      { material: 'Stabilized rammed earth wall', rangeRmbPerM2: '600-950', note: 'High thermal mass and low embodied energy' },
+      { material: 'Clay tile roof with membrane', rangeRmbPerM2: '110-220', note: 'Improves rain resilience in humid climates' },
+      { material: 'Lime-based breathable finish', rangeRmbPerM2: '70-150', note: 'Moisture buffering for mixed ventilation' },
     ],
     strategyMappings: [
       { traditional: 'Thick earthen wall', modern: 'High-mass insulated hybrid wall', useWhen: 'Cooling-dominant or mixed climates' },
@@ -93,9 +102,9 @@ const BUILDING_PACKS: Record<BuildingFamily, BuildingKnowledgePack> = {
     family: 'siheyuan',
     label: 'Siheyuan courtyard logic',
     materialRanges: [
-      { material: 'Insulated masonry perimeter wall', rangeRmbPerM2: '580-920', note: 'Winter buffering and acoustic stability' },
-      { material: 'Low-E glazing (triple where needed)', rangeRmbPerM2: '780-1550', note: 'Seasonal solar gain control' },
-      { material: 'Timber-shade gallery system', rangeRmbPerM2: '260-520', note: 'Adaptive shading with outdoor comfort value' },
+      { material: 'Insulated masonry perimeter wall', rangeRmbPerM2: '550-900', note: 'Winter buffering and acoustic stability' },
+      { material: 'Low-E glazing (triple where needed)', rangeRmbPerM2: '700-1400', note: 'Seasonal solar gain control' },
+      { material: 'Timber-shade gallery system', rangeRmbPerM2: '240-480', note: 'Adaptive shading with outdoor comfort value' },
     ],
     strategyMappings: [
       { traditional: 'South-facing court', modern: 'Solar-oriented massing with seasonal shading', useWhen: 'Heating and daylight optimization' },
@@ -107,9 +116,9 @@ const BUILDING_PACKS: Record<BuildingFamily, BuildingKnowledgePack> = {
     family: 'yaodong',
     label: 'Yaodong earth-sheltered model',
     materialRanges: [
-      { material: 'Earth-bermed RC shell', rangeRmbPerM2: '920-1380', note: 'Very stable annual thermal response' },
-      { material: 'Waterproof drainage composite layer', rangeRmbPerM2: '120-260', note: 'Critical to moisture and durability control' },
-      { material: 'Timber/CLT interior liner', rangeRmbPerM2: '420-880', note: 'Improves interior comfort and carbon profile' },
+      { material: 'Earth-bermed RC shell', rangeRmbPerM2: '880-1300', note: 'Very stable annual thermal response' },
+      { material: 'Waterproof drainage composite layer', rangeRmbPerM2: '100-240', note: 'Critical to moisture and durability control' },
+      { material: 'Timber/CLT interior liner', rangeRmbPerM2: '380-800', note: 'Improves interior comfort and carbon profile' },
     ],
     strategyMappings: [
       { traditional: 'Subsurface dwelling', modern: 'Partially buried low-load envelope', useWhen: 'Large diurnal temperature swings' },
@@ -121,9 +130,9 @@ const BUILDING_PACKS: Record<BuildingFamily, BuildingKnowledgePack> = {
     family: 'diaojiaolou',
     label: 'Diaojiaolou elevated frame',
     materialRanges: [
-      { material: 'Glulam or steel-timber stilt frame', rangeRmbPerM2: '880-1460', note: 'Flood adaptation and terrain fit' },
-      { material: 'Ventilated raised floor assembly', rangeRmbPerM2: '240-460', note: 'Moisture and mold risk reduction' },
-      { material: 'Monsoon roof drainage package', rangeRmbPerM2: '90-180', note: 'Downpour management and envelope longevity' },
+      { material: 'Glulam or steel-timber stilt frame', rangeRmbPerM2: '850-1400', note: 'Flood adaptation and terrain fit' },
+      { material: 'Ventilated raised floor assembly', rangeRmbPerM2: '220-420', note: 'Moisture and mold risk reduction' },
+      { material: 'Monsoon roof drainage package', rangeRmbPerM2: '80-160', note: 'Downpour management and envelope longevity' },
     ],
     strategyMappings: [
       { traditional: 'Raised building body', modern: 'Flood-safe podium or stilted ground plane', useWhen: 'Flood-prone or high humidity sites' },
@@ -135,9 +144,9 @@ const BUILDING_PACKS: Record<BuildingFamily, BuildingKnowledgePack> = {
     family: 'weilongwu',
     label: 'Weilongwu enclosure strategy',
     materialRanges: [
-      { material: 'High-mass masonry shell', rangeRmbPerM2: '620-980', note: 'Heat damping for subtropical climates' },
-      { material: 'Courtyard bio-retention layer', rangeRmbPerM2: '180-360', note: 'Cooling and stormwater co-benefits' },
-      { material: 'Shaded arcade structure', rangeRmbPerM2: '260-520', note: 'Outdoor comfort and passive circulation' },
+      { material: 'High-mass masonry shell', rangeRmbPerM2: '580-950', note: 'Heat damping for subtropical climates' },
+      { material: 'Courtyard bio-retention layer', rangeRmbPerM2: '160-340', note: 'Cooling and stormwater co-benefits' },
+      { material: 'Shaded arcade structure', rangeRmbPerM2: '240-480', note: 'Outdoor comfort and passive circulation' },
     ],
     strategyMappings: [
       { traditional: 'Semi-enclosed plan', modern: 'Heat and wind buffer massing', useWhen: 'Hot-humid sites with seasonal wind' },

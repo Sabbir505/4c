@@ -5,63 +5,84 @@ import ModelViewer from '../components/ModelViewer'
 import { chatWithAI } from '../services/aiService'
 import { buildingIcons } from '../data/buildings'
 import ReactMarkdown from 'react-markdown'
-import { BUILDING_PROFILES, BUILDING_PROFILE_MAP } from '../data/buildingCatalog'
+import { BUILDING_PROFILES } from '../data/buildingCatalog'
 import { NEW10_RESEARCH_BY_ID } from '../data/new10ResearchData'
-import type { BuildingFamily } from '../utils/analytics'
+import { MATERIAL_COMPARISON_BY_ID, MATERIAL_COMPARISON_SOURCES } from '../data/materialComparisons'
 import type { BuildingId } from '../data/buildings'
 
 const BUILDING_IDS = BUILDING_PROFILES.map((b) => b.id) as BuildingId[]
 
-const FEATURE_BY_FAMILY: Record<string, Record<BuildingFamily, string>> = {
-  wallThickness: {
-    tulou: '1-2m ✓',
-    siheyuan: '0.4-0.6m',
-    yaodong: 'Earth berm',
-    diaojiaolou: 'Timber frame',
-    weilongwu: '0.5-1m',
-  },
-  circularLayout: {
-    tulou: '✓',
-    siheyuan: '✗',
-    yaodong: '✗',
-    diaojiaolou: '✗',
-    weilongwu: 'Semi-circular',
-  },
-  courtyardDesign: {
-    tulou: 'Central Skywell',
-    siheyuan: '✓',
-    yaodong: '✗',
-    diaojiaolou: '✗',
-    weilongwu: '✓',
-  },
-  naturalVentilation: {
-    tulou: '✓',
-    siheyuan: '✓',
-    yaodong: 'Limited',
-    diaojiaolou: '✓✓',
-    weilongwu: '✓',
-  },
-  floodDesign: {
-    tulou: 'High Base',
-    siheyuan: '✗',
-    yaodong: '✗',
-    diaojiaolou: '✓✓',
-    weilongwu: '✓',
-  },
+// Per-building feature and performance data (no longer grouped by family).
+// Each of the 15 buildings has its own accurate profile.
+// Sources: new10ResearchData.json, CABEE 2024, academic thermal studies.
+
+const FEATURE_BY_ID: Record<string, {
+  wallThickness: string
+  circularLayout: string
+  courtyardDesign: string
+  naturalVentilation: string
+  floodDesign: string
+}> = {
+  tulou:                    { wallThickness: '1-2m ✓', circularLayout: '✓', courtyardDesign: 'Central Skywell', naturalVentilation: '✓', floodDesign: 'High Base' },
+  siheyuan:                { wallThickness: '0.4-0.6m', circularLayout: '✗', courtyardDesign: '✓', naturalVentilation: '✓', floodDesign: '✗' },
+  yaodong:                  { wallThickness: 'Earth berm', circularLayout: '✗', courtyardDesign: '✗', naturalVentilation: 'Limited', floodDesign: '✗' },
+  diaojiaolou:              { wallThickness: 'Timber frame', circularLayout: '✗', courtyardDesign: '✗', naturalVentilation: '✓✓', floodDesign: '✓✓' },
+  weilongwu:                { wallThickness: '0.5-1m', circularLayout: 'Semi-circular', courtyardDesign: '✓', naturalVentilation: '✓', floodDesign: '✓' },
+  'huizhou-residence':      { wallThickness: '0.4-0.6m', circularLayout: '✗', courtyardDesign: 'Skywell ✓', naturalVentilation: '✓', floodDesign: '✗' },
+  'jiangnan-water-town-house': { wallThickness: '0.3-0.5m', circularLayout: '✗', courtyardDesign: 'Skywell ✓', naturalVentilation: '✓✓', floodDesign: '✓' },
+  'beijing-northern-rural-house': { wallThickness: '0.4-0.6m', circularLayout: '✗', courtyardDesign: '✓', naturalVentilation: '✓', floodDesign: '✗' },
+  'northwest-adobe-house':  { wallThickness: '0.6-1m adobe', circularLayout: '✗', courtyardDesign: '✗', naturalVentilation: 'Limited', floodDesign: '✗' },
+  'lingnan-residence':      { wallThickness: '0.4-0.8m', circularLayout: '✗', courtyardDesign: 'Cold alley ✓', naturalVentilation: '✓✓', floodDesign: '✓' },
+  'sichuan-folk-house':     { wallThickness: '0.3-0.5m', circularLayout: '✗', courtyardDesign: 'Open hall ✓', naturalVentilation: '✓', floodDesign: '✓' },
+  'xinjiang-uyghur-flat-roof-house': { wallThickness: '0.5-0.8m adobe', circularLayout: '✗', courtyardDesign: 'Enclosed ✓', naturalVentilation: 'Limited', floodDesign: '✗' },
+  'tibetan-stone-house':    { wallThickness: '0.6-1.2m stone', circularLayout: '✗', courtyardDesign: '✗', naturalVentilation: 'Limited', floodDesign: '✗' },
+  'yi-bai-traditional-houses': { wallThickness: '0.3-0.5m', circularLayout: '✗', courtyardDesign: 'Screen wall ✓', naturalVentilation: '✓', floodDesign: '✓' },
+  'northeast-manor-house':  { wallThickness: '0.5-0.8m log/earth', circularLayout: '✗', courtyardDesign: '✓', naturalVentilation: '✓', floodDesign: '✗' },
 }
 
-const PERFORMANCE_BY_FAMILY: Record<string, Record<BuildingFamily, number>> = {
-  tempRegulation: { tulou: 85, siheyuan: 78, yaodong: 92, diaojiaolou: 70, weilongwu: 80 },
-  humidityControl: { tulou: 90, siheyuan: 65, yaodong: 60, diaojiaolou: 85, weilongwu: 82 },
-  energyEfficiency: { tulou: 88, siheyuan: 75, yaodong: 95, diaojiaolou: 72, weilongwu: 78 },
+const PERFORMANCE_BY_ID: Record<string, { tempRegulation: number; humidityControl: number; energyEfficiency: number }> = {
+  tulou:                    { tempRegulation: 85, humidityControl: 90, energyEfficiency: 88 },
+  siheyuan:                { tempRegulation: 78, humidityControl: 65, energyEfficiency: 75 },
+  yaodong:                  { tempRegulation: 92, humidityControl: 60, energyEfficiency: 95 },
+  diaojiaolou:              { tempRegulation: 70, humidityControl: 85, energyEfficiency: 72 },
+  weilongwu:                { tempRegulation: 80, humidityControl: 82, energyEfficiency: 78 },
+  'huizhou-residence':      { tempRegulation: 72, humidityControl: 75, energyEfficiency: 70 },
+  'jiangnan-water-town-house': { tempRegulation: 68, humidityControl: 78, energyEfficiency: 65 },
+  'beijing-northern-rural-house': { tempRegulation: 76, humidityControl: 62, energyEfficiency: 73 },
+  'northwest-adobe-house':  { tempRegulation: 88, humidityControl: 55, energyEfficiency: 90 },
+  'lingnan-residence':      { tempRegulation: 82, humidityControl: 88, energyEfficiency: 80 },
+  'sichuan-folk-house':     { tempRegulation: 68, humidityControl: 72, energyEfficiency: 65 },
+  'xinjiang-uyghur-flat-roof-house': { tempRegulation: 90, humidityControl: 50, energyEfficiency: 92 },
+  'tibetan-stone-house':    { tempRegulation: 84, humidityControl: 55, energyEfficiency: 86 },
+  'yi-bai-traditional-houses': { tempRegulation: 75, humidityControl: 70, energyEfficiency: 72 },
+  'northeast-manor-house':  { tempRegulation: 74, humidityControl: 60, energyEfficiency: 70 },
 }
 
-const SCORE_BY_FAMILY: Record<BuildingFamily, { cost: number; carbon: number; thermal: number; resilience: number; constructability: number }> = {
-  tulou: { cost: 70, carbon: 82, thermal: 84, resilience: 88, constructability: 68 },
-  siheyuan: { cost: 76, carbon: 73, thermal: 80, resilience: 70, constructability: 85 },
-  yaodong: { cost: 74, carbon: 90, thermal: 94, resilience: 67, constructability: 62 },
-  diaojiaolou: { cost: 66, carbon: 78, thermal: 71, resilience: 89, constructability: 72 },
-  weilongwu: { cost: 72, carbon: 76, thermal: 79, resilience: 82, constructability: 80 },
+const SCORE_BY_ID: Record<string, { cost: number; carbon: number; thermal: number; resilience: number; constructability: number }> = {
+  tulou:                    { cost: 70, carbon: 82, thermal: 84, resilience: 88, constructability: 68 },
+  siheyuan:                { cost: 76, carbon: 73, thermal: 80, resilience: 70, constructability: 85 },
+  yaodong:                  { cost: 74, carbon: 90, thermal: 94, resilience: 67, constructability: 62 },
+  diaojiaolou:              { cost: 66, carbon: 78, thermal: 71, resilience: 89, constructability: 72 },
+  weilongwu:                { cost: 72, carbon: 76, thermal: 79, resilience: 82, constructability: 80 },
+  'huizhou-residence':      { cost: 74, carbon: 72, thermal: 70, resilience: 68, constructability: 82 },
+  'jiangnan-water-town-house': { cost: 78, carbon: 68, thermal: 65, resilience: 72, constructability: 84 },
+  'beijing-northern-rural-house': { cost: 80, carbon: 70, thermal: 74, resilience: 66, constructability: 88 },
+  'northwest-adobe-house':  { cost: 76, carbon: 88, thermal: 88, resilience: 60, constructability: 65 },
+  'lingnan-residence':      { cost: 70, carbon: 74, thermal: 80, resilience: 84, constructability: 78 },
+  'sichuan-folk-house':     { cost: 68, carbon: 70, thermal: 66, resilience: 76, constructability: 80 },
+  'xinjiang-uyghur-flat-roof-house': { cost: 72, carbon: 88, thermal: 90, resilience: 58, constructability: 64 },
+  'tibetan-stone-house':    { cost: 70, carbon: 84, thermal: 82, resilience: 72, constructability: 60 },
+  'yi-bai-traditional-houses': { cost: 74, carbon: 78, thermal: 74, resilience: 70, constructability: 76 },
+  'northeast-manor-house':  { cost: 78, carbon: 68, thermal: 72, resilience: 64, constructability: 82 },
+}
+
+const parseRangeAverage = (value: string): number => {
+  const numbers = value.match(/\d+(?:\.\d+)?/g)
+  if (!numbers || numbers.length < 2) return 0
+  const min = Number(numbers[0])
+  const max = Number(numbers[1])
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return 0
+  return (min + max) / 2
 }
 
 const Comparison = () => {
@@ -107,30 +128,33 @@ const Comparison = () => {
     climateEn: b.climateEn,
   }))
 
-  const getFamily = (id: BuildingId): BuildingFamily => {
-    if (id in BUILDING_PROFILE_MAP) {
-      return BUILDING_PROFILE_MAP[id as keyof typeof BUILDING_PROFILE_MAP].family
-    }
-    return 'siheyuan'
-  }
-
   const getFeatureValue = (featureKey: string, id: BuildingId): string => {
-    const family = getFamily(id)
-    const value = FEATURE_BY_FAMILY[featureKey][family]
+    const features = FEATURE_BY_ID[id]
+    if (!features) return '—'
+    const value = features[featureKey as keyof typeof features]
     if (lang === 'zh') {
       if (value === 'Earth berm') return '土层覆盖'
       if (value === 'Timber frame') return '木结构'
       if (value === 'Semi-circular') return '半圆形'
       if (value === 'Central Skywell') return '中央天井'
+      if (value === 'Skywell ✓') return '天井 ✓'
+      if (value === 'Cold alley ✓') return '冷巷 ✓'
+      if (value === 'Open hall ✓') return '敞厅 ✓'
+      if (value === 'Screen wall ✓') return '照壁 ✓'
+      if (value === 'Enclosed ✓') return '封闭院落 ✓'
       if (value === 'Limited') return '有限'
       if (value === 'High Base') return '高基座'
+      if (String(value).includes('adobe')) return String(value).replace('adobe', '土坯')
+      if (String(value).includes('stone')) return String(value).replace('stone', '石墙')
+      if (String(value).includes('log/earth')) return String(value).replace('log/earth', '木/土')
     }
-    return value
+    return String(value)
   }
 
   const getPerformanceValue = (metricKey: string, id: BuildingId): number => {
-    const family = getFamily(id)
-    return PERFORMANCE_BY_FAMILY[metricKey][family]
+    const perf = PERFORMANCE_BY_ID[id]
+    if (!perf) return 0
+    return perf[metricKey as keyof typeof perf]
   }
   const dataA = buildings.find(b => b.id === buildingA)!
   const dataB = buildings.find(b => b.id === buildingB)!
@@ -168,9 +192,7 @@ const Comparison = () => {
     setBuildingC(nextC)
   }
 
-  const scoringMatrix: Record<BuildingId, { cost: number; carbon: number; thermal: number; resilience: number; constructability: number }> = Object.fromEntries(
-    BUILDING_PROFILES.map((profile) => [profile.id, SCORE_BY_FAMILY[profile.family]])
-  ) as Record<BuildingId, { cost: number; carbon: number; thermal: number; resilience: number; constructability: number }>
+  const scoringMatrix: Record<string, { cost: number; carbon: number; thermal: number; resilience: number; constructability: number }> = SCORE_BY_ID
 
   const selectedIds: BuildingId[] = comparisonMode === 3 ? [buildingA, buildingB, buildingC] : [buildingA, buildingB]
   const selectedUniqueIds = Array.from(new Set(selectedIds))
@@ -181,7 +203,40 @@ const Comparison = () => {
     return { ...b, ...score, total }
   }).sort((a, b) => b.total - a.total)
 
-  const winner = selectedScoreRows[0]
+  const selectedMaterialRows = selectedUniqueIds
+    .map((id) => {
+      const building = buildings.find((item) => item.id === id)
+      const material = MATERIAL_COMPARISON_BY_ID[id]
+      if (!building || !material) return null
+
+      const traditionalCarbonAvg = parseRangeAverage(material.traditionalEmbodiedCarbonRange)
+      const modernCarbonAvg = parseRangeAverage(material.modernEmbodiedCarbonRange)
+      const carbonReductionPct = modernCarbonAvg > 0
+        ? Math.round(((modernCarbonAvg - traditionalCarbonAvg) / modernCarbonAvg) * 100)
+        : 0
+
+      return {
+        id,
+        building,
+        material,
+        carbonReductionPct,
+      }
+    })
+    .filter((row): row is {
+      id: BuildingId
+      building: typeof buildings[number]
+      material: typeof MATERIAL_COMPARISON_BY_ID[BuildingId]
+      carbonReductionPct: number
+    } => row !== null)
+
+  const materialSources = Array.from(new Set(selectedMaterialRows.flatMap((row) => row.material.sourceIds)))
+    .map((sourceId) => MATERIAL_COMPARISON_SOURCES[sourceId])
+    .filter((source): source is (typeof MATERIAL_COMPARISON_SOURCES)[keyof typeof MATERIAL_COMPARISON_SOURCES] => Boolean(source))
+
+  const topScore = selectedScoreRows[0]?.total ?? 0
+  const topWinners = selectedScoreRows.filter((row) => row.total === topScore)
+  const winner = topWinners[0]
+  const hasTieWinner = topWinners.length > 1
   const scoringHelpText = lang === 'zh'
     ? '评分范围为 0-100，分数越高越优。\n总分计算：\n总分 = 成本×20% + 碳×25% + 热舒适×20% + 韧性×20% + 可建造性×15%（四舍五入）。\n\n维度含义：\n- 成本：经济可行性（越高表示越具成本优势）\n- 碳：低碳表现\n- 热舒适：温度调节能力\n- 韧性：对极端气候的适应能力\n- 可建造性：施工落地难度与成熟度'
     : 'Scores are on a 0-100 scale, where higher is better.\nTotal formula:\nTotal = Cost×20% + Carbon×25% + Thermal×20% + Resilience×20% + Constructability×15% (rounded).\n\nDimension meanings:\n- Cost: economic feasibility (higher means more cost-effective)\n- Carbon: low-carbon performance\n- Thermal: indoor thermal comfort/regulation\n- Resilience: adaptation to extreme climate conditions\n- Constructability: practicality and maturity for implementation'
@@ -436,14 +491,27 @@ const Comparison = () => {
             <div className="rounded-xl p-4" style={{ border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-secondary)' }}>
               <div className="flex items-center gap-2 mb-2" style={{ color: 'var(--text-primary)' }}>
                 <Trophy size={16} style={{ color: 'var(--temp-cool)' }} />
-                <span className="font-bold">{lang === 'zh' ? '推荐优胜方案' : 'Recommended Winner'}</span>
+                <span className="font-bold">{lang === 'zh' ? '推荐方案' : 'Recommended Result'}</span>
               </div>
-              <div className="text-lg font-bold mb-2" style={{ color: 'var(--temp-cool)' }}>{winner?.name}</div>
+              <div className="text-lg font-bold mb-2" style={{ color: 'var(--temp-cool)' }}>
+                {hasTieWinner
+                  ? topWinners.map((row) => row.name).join(lang === 'zh' ? ' / ' : ' / ')
+                  : winner?.name}
+              </div>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                {lang === 'zh'
+                {hasTieWinner
+                  ? (lang === 'zh'
+                    ? `当前有并列最高分（${topScore}%），建议结合项目优先级（成本/施工难度/地域供应链）做二次筛选。`
+                    : `There is a tie at the top score (${topScore}%). Use project priorities (cost, constructability, local supply chain) for final selection.`)
+                  : (lang === 'zh'
                     ? `综合评分 ${winner?.total ?? '-'}%，在低碳与韧性维度上表现更平衡，适合优先进入深化设计。`
-                    : `Composite score ${winner?.total ?? '-'}% with stronger balance in low-carbon and resilience dimensions, recommended for next-stage design.`}
+                    : `Composite score ${winner?.total ?? '-'}% with stronger balance in low-carbon and resilience dimensions, recommended for next-stage design.`)}
               </p>
+              <div className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
+                {lang === 'zh'
+                  ? '注：本面板为数据驱动的方案评分模型（用于前期决策），非项目实测值。'
+                  : 'Note: This panel is a data-driven early-stage scoring model, not project measured values.'}
+              </div>
             </div>
           </div>
         </div>
@@ -563,9 +631,9 @@ const Comparison = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-4">
+          <div className={`grid gap-4 mb-4`} style={{ gridTemplateColumns: comparisonMode === 3 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr' }}>
             <div></div>
-            {[dataA, dataB].map((data, idx) => {
+            {(comparisonMode === 3 ? [dataA, dataB, dataC] : [dataA, dataB]).map((data, idx) => {
               const IconComponent = buildingIcons[data.id].icon
               const iconGradient = buildingIcons[data.id].gradient
               
@@ -585,57 +653,44 @@ const Comparison = () => {
           
           <div className="space-y-4">
             {performanceRows.map((metric) => {
-              const valueA = getPerformanceValue(metric.key, buildingA)
-              const valueB = getPerformanceValue(metric.key, buildingB)
-              const aWins = valueA > valueB, bWins = valueB > valueA
+              const ids = comparisonMode === 3 ? [buildingA, buildingB, buildingC] : [buildingA, buildingB]
+              const values = ids.map(id => getPerformanceValue(metric.key, id))
+              const maxVal = Math.max(...values)
               
               return (
                 <div 
                   key={metric.name} 
-                  className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center p-3 rounded-xl"
-                  style={{ backgroundColor: 'var(--bg-secondary)' }}
+                  className={`grid gap-4 items-center p-3 rounded-xl`}
+                  style={{ backgroundColor: 'var(--bg-secondary)', gridTemplateColumns: comparisonMode === 3 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr' }}
                 >
                   <div className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
                     {metric.name}
                   </div>
-                  <div 
-                    className="relative h-10 rounded-full overflow-hidden"
-                    style={{ backgroundColor: 'var(--surface-card)' }}
-                  >
-                    <div 
-                      className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 flex items-center justify-end pr-3"
-                      style={{ 
-                        width: `${valueA}%`, 
-                        backgroundColor: aWins ? 'var(--temp-cool)' : 'var(--border-default)' 
-                      }}
-                    >
-                      <span 
-                        className="text-sm font-bold"
-                        style={{ color: aWins ? 'white' : 'var(--text-secondary)' }}
+                  {values.map((val, idx) => {
+                    const isBest = val === maxVal
+                    return (
+                      <div 
+                        key={idx}
+                        className="relative h-10 rounded-full overflow-hidden"
+                        style={{ backgroundColor: 'var(--surface-card)' }}
                       >
-                        {valueA}%
-                      </span>
-                    </div>
-                  </div>
-                  <div 
-                    className="relative h-10 rounded-full overflow-hidden"
-                    style={{ backgroundColor: 'var(--surface-card)' }}
-                  >
-                    <div 
-                      className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 flex items-center justify-end pr-3"
-                      style={{ 
-                        width: `${valueB}%`, 
-                        backgroundColor: bWins ? 'var(--temp-cool)' : 'var(--border-default)' 
-                      }}
-                    >
-                      <span 
-                        className="text-sm font-bold"
-                        style={{ color: bWins ? 'white' : 'var(--text-secondary)' }}
-                      >
-                        {valueB}%
-                      </span>
-                    </div>
-                  </div>
+                        <div 
+                          className="absolute left-0 top-0 h-full rounded-full transition-all duration-700 flex items-center justify-end pr-3"
+                          style={{ 
+                            width: `${val}%`, 
+                            backgroundColor: isBest ? 'var(--temp-cool)' : 'var(--border-default)' 
+                          }}
+                        >
+                          <span 
+                            className="text-sm font-bold"
+                            style={{ color: isBest ? 'white' : 'var(--text-secondary)' }}
+                          >
+                            {val}%
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
@@ -666,7 +721,7 @@ const Comparison = () => {
                   <th className="p-4 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>
                     {t('compare.feature')}
                   </th>
-                  {[dataA, dataB].map((data, idx) => {
+                  {(comparisonMode === 3 ? [dataA, dataB, dataC] : [dataA, dataB]).map((data, idx) => {
                     const IconComponent = buildingIcons[data.id].icon
                     const iconGradient = buildingIcons[data.id].gradient
                     
@@ -686,8 +741,8 @@ const Comparison = () => {
               </thead>
               <tbody>
                 {featureRows.map((feature, idx) => {
-                  const valueA = getFeatureValue(feature.key, buildingA)
-                  const valueB = getFeatureValue(feature.key, buildingB)
+                  const ids = comparisonMode === 3 ? [buildingA, buildingB, buildingC] : [buildingA, buildingB]
+                  const featureValues = ids.map(id => getFeatureValue(feature.key, id))
                   const renderValue = (val: string) => {
                     if (val === '✓' || val === '✓✓') return (
                       <div className="flex justify-center">
@@ -715,13 +770,144 @@ const Comparison = () => {
                       }}
                     >
                       <td className="p-4 font-medium" style={{ color: 'var(--text-primary)' }}>{feature.name}</td>
-                      <td className="p-4 text-center">{renderValue(valueA)}</td>
-                      <td className="p-4 text-center">{renderValue(valueB)}</td>
+                      {featureValues.map((val, vIdx) => (
+                        <td key={vIdx} className="p-4 text-center">{renderValue(val)}</td>
+                      ))}
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Material Comparison */}
+        <div className={`modern-card rounded-2xl p-6 mb-6 transition-all duration-700 delay-[450ms] ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
+          <h2
+            className="font-bold mb-3 flex items-center gap-2"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <div className="w-1 h-5 rounded-full" style={{ background: 'var(--gradient-brand)' }} />
+            <Layers size={18} style={{ color: 'var(--brand-primary)' }} />
+            {lang === 'zh' ? '传统材料 vs 现代材料' : 'Traditional vs Modern Materials'}
+          </h2>
+          <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
+            {lang === 'zh'
+              ? '以下对比基于中国标准与研究资料，展示所选建筑的传统材料体系与现代常规材料体系在碳排放与气候适配上的差异。'
+              : 'The comparison below uses Chinese standards and studies to contrast selected vernacular materials with modern baseline material systems on carbon and climate fitness.'}
+          </p>
+
+          <div className={`grid gap-5 ${comparisonMode === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+            {selectedMaterialRows.map(({ id, building, material, carbonReductionPct }) => {
+              const iconGradient = buildingIcons[id].gradient
+              const IconComponent = buildingIcons[id].icon
+              const climateBetterTraditional = material.climateSuitabilityTraditional >= material.climateSuitabilityModern
+              const carbonBetterTraditional = material.carbonEfficiencyTraditional >= material.carbonEfficiencyModern
+
+              return (
+                <div
+                  key={id}
+                  className="rounded-2xl p-4"
+                  style={{ border: '1px solid var(--border-default)', backgroundColor: 'var(--surface-card)' }}
+                >
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-xs font-semibold" style={{ background: iconGradient }}>
+                      <IconComponent size={14} />
+                      {building.name}
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--brand-primary-glow)', color: 'var(--brand-primary)' }}>
+                      {lang === 'zh' ? '碳减排' : 'Carbon Cut'} {carbonReductionPct}%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div className="text-xs font-semibold mb-2" style={{ color: 'var(--temp-cool)' }}>
+                        {lang === 'zh' ? '传统材料' : 'Traditional'}
+                      </div>
+                      <ul className="space-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {(lang === 'zh' ? material.traditionalMaterialsZh : material.traditionalMaterialsEn).map((item) => (
+                          <li key={item}>• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                        {lang === 'zh' ? '现代对照材料' : 'Modern Baseline'}
+                      </div>
+                      <ul className="space-y-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {(lang === 'zh' ? material.modernMaterialsZh : material.modernMaterialsEn).map((item) => (
+                          <li key={item}>• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
+                    <div className="rounded-lg p-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div style={{ color: 'var(--text-muted)' }}>{lang === 'zh' ? '传统隐含碳' : 'Traditional EC'}</div>
+                      <div className="font-semibold" style={{ color: 'var(--temp-cool)' }}>{material.traditionalEmbodiedCarbonRange}</div>
+                    </div>
+                    <div className="rounded-lg p-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div style={{ color: 'var(--text-muted)' }}>{lang === 'zh' ? '现代隐含碳' : 'Modern EC'}</div>
+                      <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{material.modernEmbodiedCarbonRange}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-3">
+                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {lang === 'zh' ? '气候适配' : 'Climate Fit'}: {material.climateSuitabilityTraditional} / {material.climateSuitabilityModern}
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${material.climateSuitabilityTraditional}%`, backgroundColor: 'var(--temp-cool)' }} />
+                    </div>
+
+                    <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {lang === 'zh' ? '碳效率' : 'Carbon Efficiency'}: {material.carbonEfficiencyTraditional} / {material.carbonEfficiencyModern}
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${material.carbonEfficiencyTraditional}%`, backgroundColor: 'var(--brand-primary)' }} />
+                    </div>
+                  </div>
+
+                  <div className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    {lang === 'zh' ? material.summaryZh : material.summaryEn}
+                  </div>
+
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    <span className="text-[11px] px-2 py-1 rounded-full" style={{ backgroundColor: climateBetterTraditional ? 'var(--temp-cool-light)' : 'var(--bg-secondary)', color: climateBetterTraditional ? 'var(--temp-cool)' : 'var(--text-muted)' }}>
+                      {lang === 'zh' ? '气候适配：传统更优' : 'Climate: Traditional leads'}
+                    </span>
+                    <span className="text-[11px] px-2 py-1 rounded-full" style={{ backgroundColor: carbonBetterTraditional ? 'var(--temp-cool-light)' : 'var(--bg-secondary)', color: carbonBetterTraditional ? 'var(--temp-cool)' : 'var(--text-muted)' }}>
+                      {lang === 'zh' ? '碳表现：传统更优' : 'Carbon: Traditional leads'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-5 rounded-xl p-4" style={{ border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-secondary)' }}>
+            <div className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+              {lang === 'zh' ? '参考来源（中国标准与研究）' : 'References (Chinese Standards & Studies)'}
+            </div>
+            <div className="grid gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              {materialSources.map((source) => (
+                <a
+                  key={source.id}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg px-3 py-2 hover:underline"
+                  style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border-light)' }}
+                >
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{source.title}</span>
+                  <span> · {source.publisher} · {source.year}</span>
+                  <div style={{ color: 'var(--text-muted)' }}>{lang === 'zh' ? source.noteZh : source.noteEn}</div>
+                </a>
+              ))}
+            </div>
           </div>
         </div>
 

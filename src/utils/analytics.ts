@@ -46,6 +46,10 @@ export const computeCarbonProfile = (
   buildingFamilyOrEmbodiedReduction: BuildingFamily | number,
   operationalReductionInput?: number
 ): CarbonProfile => {
+  // Embodied carbon baseline: ~520 kgCO2e/m² for Chinese residential construction
+  // Source: China Building Energy Conservation Association (CABEE) 2024 report;
+  // Engineering journal DOI 10.1016/j.eng.2023.08.019
+  // Steel-concrete residential: ~610 kgCO2e/m²; vernacular earth/timber: ~370-520
   const embodiedBaselineFactor = 520
   const embodiedReductionMap: Record<BuildingFamily, number> = {
     tulou: 0.26,
@@ -54,6 +58,9 @@ export const computeCarbonProfile = (
     diaojiaolou: 0.28,
     weilongwu: 0.23,
   }
+  // Operational carbon baseline: ~68 kgCO2e/m²/year for Chinese residential
+  // Source: CABEE 2024 report; national avg electricity factor 0.5366 kgCO2/kWh (2021)
+  // Adjusted downward for passive vernacular buildings vs code-compliant modern
   const operationalBaselineFactor = 68
   const operationalReductionMap: Record<BuildingFamily, number> = {
     tulou: 0.24,
@@ -92,6 +99,9 @@ export const computeCarbonProfile = (
 
 export const computeCostSummary = (areaM2: number, multiplier = 1): CostSummary => {
   const safeMultiplier = clampFactor(multiplier, 0.7, 1.8)
+  // Cost baselines (RMB/m²) for rural Chinese residential construction
+  // Source: 2024 rural self-build cost surveys; typical range 800-1500 RMB/m²
+  // Materials ~650, Labor ~400, Engineering ~80 (all per m²)
   const materials = Math.round(areaM2 * 650 * safeMultiplier)
   const labor = Math.round(areaM2 * 400 * safeMultiplier)
   const engineering = Math.round(areaM2 * 80 * safeMultiplier)

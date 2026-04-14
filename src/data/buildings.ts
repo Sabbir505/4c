@@ -74,7 +74,7 @@ export const BUILDING_COORDS: Record<BuildingId, [number, number]> = {
   'northwest-adobe-house': [106.2, 37.4],
   'lingnan-residence': [113.3, 23.1],
   'sichuan-folk-house': [104.1, 30.7],
-  'xinjiang-uyghur-flat-roof-house': [87.6, 43.8],
+  'xinjiang-uyghur-flat-roof-house': [75.9, 39.5],
   'tibetan-stone-house': [91.1, 29.6],
   'yi-bai-traditional-houses': [100.2, 25.6],
   'northeast-manor-house': [126.6, 45.8],

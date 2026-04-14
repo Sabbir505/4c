@@ -13,8 +13,8 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '12世纪，福建客家人开始建造大型夯土建筑群，用于防御和 communal living。',
-      descriptionEn: '12th century, Hakka communities in Fujian built large rammed-earth compounds for defense and communal living.'
+      description: '12世纪（南宋），福建客家人开始建造大型夯土建筑群，用于防御和聚族而居。',
+      descriptionEn: '12th century (Southern Song), Hakka communities in Fujian built large rammed-earth compounds for defense and communal living.'
     },
     {
       period: '明清时期',
@@ -76,62 +76,62 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '吊脚楼在中国西南少数民族中发展起来，作为对潮湿地形、河流和山坡的适应。',
-      descriptionEn: 'Developed among ethnic groups in southwest China as an adaptation to humid terrain, rivers, and mountain slopes.'
+      description: '吊脚楼起源于先秦时期百越族群干栏建筑传统，在西南潮湿山地、河流和坡地环境中逐步发展。',
+      descriptionEn: 'Diaojiaolou originated from the pre-Qin Ganlan (stilt) building tradition of the Baiyue peoples, evolving in the humid mountains, rivers, and slopes of the southwest.'
     },
     {
       period: '发展演变',
       periodEn: 'Development',
-      description: '历史可追溯到许多代之前，设计演变为保持房屋干燥、通风，并保护免受蛇和潮湿地面影响。',
-      descriptionEn: 'History stretches back many generations, with the design evolving to keep homes dry, ventilated, and safe from snakes and damp ground.'
+      description: '唐宋以来，土家族、苗族、侗族等不断完善吊脚楼形制，架空底层保持干燥通风，防止蛇虫和地潮。',
+      descriptionEn: 'From the Tang and Song dynasties onward, the Tujia, Miao, and Dong peoples refined the diaojiaolou form, elevating the ground floor for dry ventilation and protection from snakes and ground moisture.'
     },
     {
       period: '现代时期',
       periodEn: 'Modern Era',
-      description: '它们已成为少数民族建筑的重要象征，特别是土家族、苗族和侗族。',
-      descriptionEn: 'They have become an important symbol of minority architecture, especially for the Tujia, Miao, and Dong peoples.'
+      description: '2006年吊脚楼营造技艺被列入国家级非物质文化遗产名录，成为土家族、苗族和侗族建筑文化的重要象征。',
+      descriptionEn: 'In 2006, diaojiaolou construction techniques were listed as national intangible cultural heritage, becoming an important symbol of Tujia, Miao, and Dong architectural culture.'
     }
   ],
 
-  'hakka-weilongwu': [
+  weilongwu: [
     {
-      period: '起源时期',
-      periodEn: 'Origins',
-      description: '围龙屋作为中国南方客家居住形式发展起来，与更广泛的客家 communal、防御性住房传统密切相关。',
-      descriptionEn: 'Developed as a Hakka residential form in south China, closely related to the broader Hakka tradition of communal, defensive housing.'
+      period: '唐宋时期',
+      periodEn: 'Tang & Song Dynasties',
+      description: '围龙屋的雏形可追溯至唐宋时期，客家人南迁后在粤东地区形成聚族而居的防御性围合建筑。',
+      descriptionEn: 'Prototypes trace to the Tang and Song dynasties, when Hakka migrants southward formed defensive communal enclosures in eastern Guangdong.'
     },
     {
       period: '明清时期',
       periodEn: 'Ming & Qing Dynasties',
-      description: '其成熟形式随着客家人适应迁徙、防御需求和基于宗族的生活而出现，特别是从明朝到清朝时期。',
-      descriptionEn: 'Its mature form emerged as Hakka communities adapted to migration, defense needs, and clan-based living, especially from the Ming through Qing periods.'
+      description: '明代中后期围龙屋形制成熟，前半月形池塘、后半月化胎的布局定型，清代大规模兴建，成为客家宗族聚落的核心。',
+      descriptionEn: 'The mature form emerged in the mid-to-late Ming, with the front crescent pond and rear crescent embankment layout fixed. Large-scale construction continued through the Qing, becoming the core of Hakka clan settlements.'
     },
     {
       period: '现代时期',
       periodEn: 'Modern Era',
-      description: '越来越多地被研究和保存为客家乡土建筑的地域变体。',
-      descriptionEn: 'It is increasingly studied and preserved as a regional variation of Hakka vernacular architecture.'
+      description: '20世纪末以来，围龙屋被列为文物保护单位，梅州等地围龙屋群成为客家文化遗产的重要载体。',
+      descriptionEn: 'Since the late 20th century, weilongwu have been listed as cultural heritage sites, with Meizhou clusters becoming key carriers of Hakka cultural heritage.'
     }
   ],
 
-  huizhou: [
+  'huizhou-residence': [
     {
       period: '秦汉时期',
       periodEn: 'Qin & Han Dynasties',
-      description: '徽州民居的建筑技术可追溯到秦汉时期，当时早期结构系统已经投入使用。',
-      descriptionEn: 'Construction techniques trace back to the Qin and Han dynasties, when early structural systems were already in use.'
+      description: '徽州民居的建筑技术可追溯至秦汉时期，当时早期穿斗式木构架体系已在使用。',
+      descriptionEn: 'Construction techniques trace back to the Qin and Han dynasties, when early chuan-dou timber frame systems were already in use.'
     },
     {
       period: '宋代',
       periodEn: 'Song Dynasty',
-      description: '建筑方法得到改进并融合了不同的木构架传统，为后来的徽州风格奠定了基础。',
-      descriptionEn: 'Building methods improved and merged different timber-framing traditions, laying the foundation for later Huizhou style.'
+      description: '宋代徽商崛起带动住宅营造技艺进步，穿斗式与抬梁式木构架融合，天井院落布局初步形成。',
+      descriptionEn: 'The rise of Huizhou merchants in the Song dynasty drove advances in residential construction, merging chuan-dou and tai-liang timber frames, and the skywell courtyard layout took initial shape.'
     },
     {
       period: '明清时期',
       periodEn: 'Ming & Qing Dynasties',
-      description: '内部 patio 布局和熟悉的"四柱五梁"结构已经稳定，清朝时期风格达到完全成熟，以其著名的白墙、黑瓦和高度精致的装饰而闻名。',
-      descriptionEn: 'The internal patio layout and familiar "four pillars, five beams" structure had become stable, and in the Qing dynasty the style reached full maturity with its well-known white walls, black tiles, and highly refined ornament.'
+      description: '明代天井院落与"四柱五梁"结构定型，清代风格完全成熟，以粉墙黛瓦、马头墙和精美砖木雕饰著称。',
+      descriptionEn: 'The skywell courtyard and "four pillars, five beams" structure stabilized in the Ming, and the style reached full maturity in the Qing with its iconic white walls, dark tiles, horse-head gables, and refined brick-and-wood carving.'
     }
   ],
 
@@ -139,8 +139,8 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '江南水乡民居在长江下游地区悠久的定居历史中发展起来，潮湿的天气和密集的水道将建筑塑造为 compact courtyard 和河畔形式。',
-      descriptionEn: 'Developed in the long settlement history of the lower Yangtze region, where humid weather and dense waterways shaped architecture toward compact courtyard and riverside forms.'
+      description: '江南水乡民居在长江下游地区发展起来，可追溯至六朝时期（3-6世纪），潮湿气候和密布水道将建筑塑造为紧凑院落和临河形式。',
+      descriptionEn: 'Jiangnan water town houses developed in the lower Yangtze region, traceable to the Six Dynasties period (3rd-6th centuries), where humid climate and dense waterways shaped compact courtyard and riverside forms.'
     },
     {
       period: '宋明清时期',
@@ -160,19 +160,19 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '北方乡村住宅围绕与北京四合院相同的 courtyard 传统形成，但采用更简单、更实用的形式，适应更冷、多风的乡村条件。',
-      descriptionEn: 'Took shape around the same courtyard tradition as Beijing siheyuan, but in a simpler and more practical form suited to colder, windier rural conditions.'
+      description: '北方乡村住宅围绕与北京四合院相同的院落传统形成，可追溯至元代，但采用更简朴实用的形式，适应更冷、多风的乡村条件。',
+      descriptionEn: 'Northern rural houses followed the same courtyard tradition as Beijing siheyuan, traceable to the Yuan dynasty, but in a simpler and more practical form suited to colder, windier rural conditions.'
     },
     {
       period: '明清时期',
       periodEn: 'Ming & Qing Dynasties',
-      description: '发展加速，基于 courtyard 的家庭 compound 在华北地区广泛传播。',
+      description: '明清时期发展加速，基于院落的家族合院在华北地区广泛传播。',
       descriptionEn: 'Their development accelerated during the Ming and Qing dynasties, when courtyard-based family compounds spread widely across northern China.'
     },
     {
       period: '现代时期',
       periodEn: 'Modern Era',
-      description: '许多被新住房取代，尽管幸存的例子仍然展示了 compact、内向型乡村生活的逻辑。',
+      description: '许多被新住房取代，尽管幸存的例子仍然展示了紧凑、内向型乡村生活的逻辑。',
       descriptionEn: 'Many were replaced by new housing, though surviving examples still show the logic of compact, inward-facing rural life.'
     }
   ],
@@ -181,14 +181,14 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '西北土坯民居在干燥、气候挑战的地区发展起来，土基材料既实用又经济。',
-      descriptionEn: 'Evolved in dry, climate-challenged regions where earth-based materials were practical and economical.'
+      description: '西北土坯民居在新石器时代已见雏形，在干旱少雨的黄土地区，土基材料既实用又经济。',
+      descriptionEn: 'Prototypes appeared in the Neolithic period, and in the arid loess regions, earth-based materials were both practical and economical.'
     },
     {
       period: '发展演变',
       periodEn: 'Development',
-      description: '其根源与长期存在的乡土建筑传统有关，利用当地土壤建造厚墙以实现热稳定性，特别是在木材稀缺的地区。',
-      descriptionEn: 'Their roots are tied to long-standing vernacular building traditions that used local soil to create thick walls with thermal stability, especially in areas where timber was scarce.'
+      description: '汉唐以来，丝绸之路沿线居民利用当地黄土建造厚墙以实现热稳定性，特别是在木材稀缺的干旱地区。',
+      descriptionEn: 'From the Han and Tang dynasties, residents along the Silk Road used local loess to build thick walls for thermal stability, especially in arid areas where timber was scarce.'
     },
     {
       period: '现代时期',
@@ -202,8 +202,8 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '岭南民居从早期南方民族的建筑发展而来，随着该地区更多地融入中华帝国，逐渐吸收了唐宋文化的影响。',
-      descriptionEn: 'Developed from the architecture of early southern peoples and gradually absorbed influences from Tang and Song culture as the region became more integrated into imperial China.'
+      description: '岭南民居从南越族干栏建筑发展而来，秦统一岭南后逐渐吸收中原建筑影响，唐宋时期岭南建筑风格初步形成。',
+      descriptionEn: 'Lingnan houses evolved from the Nanyue stilt-building tradition, absorbing Central Plains influences after the Qin unification, and a distinct Lingnan style emerged by the Tang and Song dynasties.'
     },
     {
       period: '14-15世纪',
@@ -223,8 +223,8 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '巴蜀民居在四川盆地气候的影响下发展起来，布局和材料适合潮湿、炎热和日常生活。',
-      descriptionEn: 'Developed under the influence of the basin climate, with layouts and materials suited to moisture, heat, and everyday family life.'
+      description: '巴蜀民居在四川盆地湿热气候影响下发展起来，可追溯至古蜀国时期，布局和材料适应潮湿、炎热和日常生活。',
+      descriptionEn: 'Bashu houses developed under the humid basin climate, traceable to the ancient Shu kingdom period, with layouts and materials suited to moisture, heat, and everyday family life.'
     },
     {
       period: '明清时期',
@@ -244,8 +244,8 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '新疆维吾尔族民居在绿洲定居点发展了几个世纪，气候、社区生活和伊斯兰文化模式影响了设计。',
-      descriptionEn: 'Developed over centuries in oasis settlements where climate, community life, and Islamic cultural patterns influenced design.'
+      description: '新疆维吾尔族民居在绿洲定居点发展了数百年，10世纪伊斯兰教传入后，宗教文化深刻影响了庭院布局和装饰风格。',
+      descriptionEn: 'Uyghur houses developed over centuries in oasis settlements, and after Islam arrived in the 10th century, religious culture deeply influenced courtyard layout and decorative style.'
     },
     {
       period: '发展演变',
@@ -265,8 +265,8 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '藏式石屋在高海拔地区发展起来，石材、泥土和绝缘材料是生存的最佳可用材料。',
-      descriptionEn: 'Evolved in high-altitude regions where stone, earth, and insulation were the best available materials for survival.'
+      description: '藏式石屋在青藏高原发展起来，可追溯至吐蕃时期（7-9世纪），石材、夯土和毛毡是高原生存的最佳材料。',
+      descriptionEn: 'Tibetan stone houses evolved on the Qinghai-Tibet Plateau, traceable to the Tubo period (7th-9th centuries), where stone, rammed earth, and felt were the best materials for highland survival.'
     },
     {
       period: '发展演变',
@@ -286,14 +286,14 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '彝族和白族民居从中国西南独特的民族传统发展而来，由山地地形、当地材料和强大的家庭组织塑造。',
-      descriptionEn: 'Grew out of distinct ethnic traditions in southwest China, shaped by mountain terrain, local materials, and strong household organization.'
+      description: '彝族民居从西南土掌房传统发展而来，白族民居在大理地区形成了"三坊一照壁"院落格局，可追溯至南诏时期（7-9世纪）。',
+      descriptionEn: 'Yi houses evolved from the tuzhangfang (earthen flat-roof) tradition, while Bai houses formed the "three wings and one screen wall" courtyard layout in Dali, traceable to the Nanzhao period (7th-9th centuries).'
     },
     {
       period: '发展演变',
       periodEn: 'Development',
-      description: '它们的形式在很长一段时间内演变，彝族适应了土坯住宅，白族在大理等地发展了 more courtyard-centered 和装饰华丽的住宅。',
-      descriptionEn: 'Their forms evolved over a long period, with the Yi adapting earthen dwellings and the Bai developing more courtyard-centered and ornamented homes in places like Dali.'
+      description: '明清时期，彝族土掌房和白族"三坊一照壁"形制成熟，白族民居以精美彩绘和石雕装饰著称，大理喜洲等地保存了大量实例。',
+      descriptionEn: 'During the Ming and Qing dynasties, the Yi tuzhangfang and Bai "three wings and one screen wall" forms matured, with Bai houses renowned for colorful painting and stone carving; Xizhou in Dali preserves many examples.'
     },
     {
       period: '现代时期',
@@ -307,13 +307,13 @@ export const BUILDING_HISTORIES: Record<string, HistoricalPeriod[]> = {
     {
       period: '起源时期',
       periodEn: 'Origins',
-      description: '东北庄园住宅比许多南方形式发展得更晚，反映了该地区的边疆历史、气候以及士绅和地主庄园的兴起。',
-      descriptionEn: 'Developed later than many southern forms, reflecting the region\'s frontier history, climate, and the rise of gentry and landlord estates.'
+      description: '东北庄园住宅发展较晚，清代满族入关后，旗人庄园和地主大院在东北平原兴起，反映了边疆垦殖和严寒气候的双重影响。',
+      descriptionEn: 'Northeast manor houses developed later; after the Qing Manchu conquest, banner estates and landlord compounds arose on the Northeast Plain, reflecting both frontier reclamation and severe cold climate.'
     },
     {
       period: '清朝时期',
       periodEn: 'Qing Dynasty',
-      description: '其成熟形式在清朝时期扩大，当时大型 compound-style 住宅和贵族庄园在东北更加稳固。',
+      description: '其成熟形式在清朝中后期扩大，大型合院式住宅和贵族庄园在东北更加稳固。',
       descriptionEn: 'Their mature form expanded during the Qing dynasty, when large compound-style residences and noble estates became more established in the northeast.'
     },
     {

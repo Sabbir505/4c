@@ -5,7 +5,12 @@ import { useLanguage } from '../context/LanguageContext'
 import { chatWithAIStream, analyzeImageStream, fetchDataHubResearch, type DataHubResearchPayload, type Message as AIMessage, type AssistantPhase } from '../services/aiService'
 import { parseAreaFromText, computeCarbonProfile, computeCostSummary } from '../utils/analytics'
 import { buildLocalKnowledgePromptContext } from '../data/localKnowledgePacks'
-import { buildNew10ResearchPromptContext, detectNew10ResearchEntry, NEW10_RESEARCH_BY_ID } from '../data/new10ResearchData'
+import {
+  buildNew10ResearchPromptContext,
+  buildNew10ResearchPortfolioContext,
+  detectNew10ResearchEntry,
+  NEW10_RESEARCH_BY_ID,
+} from '../data/new10ResearchData'
 import { BUILDING_PROFILES, BUILDING_PROFILE_MAP } from '../data/buildingCatalog'
 import type { BuildingId } from '../data/buildings'
 
@@ -994,6 +999,11 @@ ${caseTable}
       `${promptBuildingProfile.nameEn} ${promptBuildingProfile.nameZh} ${siteProfile.buildingType} ${baseIntent}`,
       lang
     )
+    const portfolioResearchContext = buildNew10ResearchPortfolioContext({
+      text: `${promptBuildingProfile.nameEn} ${promptBuildingProfile.nameZh} ${baseIntent}`,
+      lang,
+      siteProfile,
+    })
 
     setInput('')
     setPendingImage(null)
@@ -1059,8 +1069,17 @@ ${caseTable}
 
       const complianceContext = buildConstraintHintContext(complianceHints, lang)
       const contextualSeed = templateMode === 'consultation'
-        ? [baseIntent, localKnowledge.snippet, extractedResearchContext, retrievalContext, complianceContext].filter(Boolean).join('\n\n')
-        : [baseIntent, extractedResearchContext].filter(Boolean).join('\n\n')
+        ? [
+            baseIntent,
+            localKnowledge.snippet,
+            portfolioResearchContext,
+            extractedResearchContext,
+            retrievalContext,
+            complianceContext,
+          ]
+            .filter(Boolean)
+            .join('\n\n')
+        : [baseIntent, portfolioResearchContext, extractedResearchContext].filter(Boolean).join('\n\n')
 
       const promptToModel = buildContextualPrompt(contextualSeed, templateMode)
 
