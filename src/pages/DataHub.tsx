@@ -7,7 +7,9 @@ import { buildingIcons, getEChartsColors } from '../data/buildings'
 import ReactECharts from 'echarts-for-react'
 import { BUILDING_PROFILES } from '../data/buildingCatalog'
 import { NEW10_RESEARCH_BY_ID } from '../data/new10ResearchData'
-import { parseAreaFromText, inferBuildingFamily } from '../utils/analytics'
+import type { New10ResearchEntry } from '../data/new10ResearchData'
+import { parseAreaFromText, inferBuildingFamily, computeCarbonProfile } from '../utils/analytics'
+import type { BuildingId } from '../data/buildings'
 
 interface AnalysisProfile {
   city: string
@@ -39,21 +41,264 @@ interface SupplierItem {
   supplier: string
 }
 
-const parseTemperatureValue = (value: string): number | null => {
-  const match = value.match(/-?\d+(?:\.\d+)?/)
-  if (!match) return null
-  const parsed = Number(match[0])
-  return Number.isFinite(parsed) ? parsed : null
+const RESEARCH_ZH_LOOKUP: Record<string, string> = {
+  'Hot Summer / Warm Winter': '夏热冬暖',
+  'Cold Zone': '寒冷地区',
+  'Cold or Severe Cold': '寒冷或严寒地区',
+  'Hot Summer / Cold Winter': '夏热冬冷',
+  'Severe Cold / Temperate Dry': '严寒 / 温带干旱',
+  'Severe Cold': '严寒地区',
+  'Temperate Plateau': '温和高原',
+  'Rammed-earth thermal mass with compact enclosure': '夯土高热容围护与紧凑体量',
+  'South-facing courtyard solar zoning': '南向院落的太阳分区',
+  'Earth-sheltered loess envelope with high thermal inertia': '覆土黄土围护与高热惰性',
+  'Elevated stilt structure for flood and moisture control': '架空吊脚结构用于防洪与防潮',
+  'Semi-enclosed arc form with central ventilation court': '半围合弧形布局结合中央通风庭院',
+  'Sky-well stack ventilation': '天井烟囱通风',
+  'Canal breeze plus overhanging eaves': '河道风引入与深出檐',
+  'Kang platform and thick north-south walls': '炕体平台与厚重南北墙体',
+  'Ground-coupled loess thermal mass': '与地耦合的黄土高热容围护',
+  'Cold alley Venturi ventilation': '冷巷文丘里通风',
+  'Bamboo microclimate plus open hall ventilation': '竹林微气候与敞厅通风',
+  'Adobe mass plus flat-roof night cooling': '土坯热容与平屋顶夜间散热',
+  'South glazing solar gain plus stone mass': '南向采光得热与石材热容',
+  'Screen-wall solar reflection and wind buffering': '照壁反射日照与挡风缓冲',
+  'Three-sided Kang radiant heating': '三面炕辐射供暖',
+  'Inner courtyard stack ventilation and deep eaves shading': '内院烟囱效应通风与深檐遮阳',
+  'Layered enclosure, shaded galleries, and seasonal opening control': '分层围护、遮阴廊道与季节性开闭控制',
+  'Courtyard orientation and reduced opening area for winter heat retention': '院落朝向优化与减小开口以保温',
+  'Permeable underfloor ventilation and deep overhang drainage': '架空层透风与深檐排水',
+  'Shaded arcades, thick walls, and pond-assisted evaporative cooling': '遮阴骑楼、厚墙与池塘辅助蒸发降温',
+  'Brick thermal mass plus reflective white walls': '砖墙热容与白色反射墙面',
+  'Two-storey elevated plan with skywell': '双层抬高平面与天井',
+  'Wide courtyard winter solar gain': '宽院落冬季日照得热',
+  'Adobe night-radiation roof and Kang': '土坯夜间辐射屋顶与炕',
+  'Deep eaves, shading arcades, and water features': '深檐、遮阴廊道与水体',
+  'Stone or rammed-earth thermal mass': '石材或夯土高热容围护',
+  'Grape-trellis evaporative courtyard': '葡萄架蒸发庭院',
+  'North buffer spaces and inward-sloping walls': '北侧缓冲空间与内倾墙体',
+  'White walls plus curved eaves': '白墙与曲檐',
+  'Thick log or earth walls with wide winter courtyard': '厚木/土墙与宽敞冬季院落',
+  'Approx -8 to -13 C (indoor core vs afternoon outdoor peak)': '约 -8 至 -13°C（室内核心区相对下午室外峰值）',
+  'Approx +4 to +7 C (indoor core vs outdoor)': '约 +4 至 +7°C（室内核心区相对室外）',
+  'Estimated -6 to -10 C in shaded courtyard-side rooms': '估计 -6 至 -10°C（遮阴院落侧房间）',
+  'Estimated +5 to +9 C with solar gain and wind protection': '估计 +5 至 +9°C（依靠日照得热与避风）',
+  'Approx -10 to -20 C with near-zero daytime cooling demand': '约 -10 至 -20°C，白天几乎无需制冷',
+  'Approx +8 to +12 C compared with outdoor air': '约 +8 至 +12°C（相对室外空气）',
+  'Approx -4 to -7 C from enhanced cross-ventilation and shaded floor': '约 -4 至 -7°C（来自强化交叉通风与遮阴架空地板）',
+  'Estimated +1 to +3 C (limited winter buffering)': '估计 +1 至 +3°C（冬季缓冲有限）',
+  'Approx -6 to -13 C depending on courtyard airflow and shading depth': '约 -6 至 -13°C（取决于院落气流与遮阳深度）',
+  'Estimated +2 to +4 C in enclosed rear rooms': '估计 +2 至 +4°C（封闭后部房间）',
+  '-2.6 C (bedroom vs outdoor)': '-2.6°C（卧室相对室外）',
+  '+1.8 C (bedroom vs outdoor)': '+1.8°C（卧室相对室外）',
+  'Estimated -1 to -2 C': '估计 -1 至 -2°C',
+  'Not directly measured': '暂无直接实测',
+  'Estimated -3 to -5 C peak': '估计 -3 至 -5°C（峰值时段）',
+  'Estimated +8 to +12 C with Kang': '估计 +8 至 +12°C（配合炕体）',
+  'Approx -10 to -15 C, near-zero cooling demand': '约 -10 至 -15°C，制冷需求接近零',
+  '+9.6 to +10.9 C vs outdoor': '+9.6 至 +10.9°C（相对室外）',
+  'Estimated -3 to -5 C in cold-alley adjacent rooms (95% comfort hours)': '估计 -3 至 -5°C（冷巷邻近房间，舒适小时占比约95%）',
+  'Estimated +1 to +2 C (limited winter buffering)': '估计 +1 至 +2°C（冬季缓冲有限）',
+  'Estimated -2 to -4 C vs modern thin-wall reference': '估计 -2 至 -4°C（相对现代薄墙参照）',
+  '+2.36 C neutral temperature above outdoor': '+2.36°C（中性温度高于室外）',
+  'Estimated -10 to -15 C peak cooling': '估计 -10 至 -15°C（峰值降温）',
+  'Estimated +8 to +12 C vs outdoor (thick adobe thermal mass)': '估计 +8 至 +12°C（相对室外，来自厚土坯热容）',
+  'Negligible cooling demand; summer interior ~15-22 C': '几乎无需制冷；夏季室内约 15–22°C',
+  'Passive +8 to +10 C winter uplift': '被动增温约 +8 至 +10°C',
+  'Estimated -1 to -2 C (mild climate; little cooling needed)': '估计 -1 至 -2°C（气候温和，几乎不需制冷）',
+  'Estimated +1 to +3 C from stone/earth thermal mass (mild climate)': '估计 +1 至 +3°C（来自石/土热容，气候温和）',
+  'Negligible cooling demand; summer interior ~22-25 C': '几乎无需制冷；夏季室内约 22–25°C',
+  'Estimated +20 to +30 C with Kang and thermal mass': '估计 +20 至 +30°C（依靠炕与高热容围护）',
+  'High-mass earthen enclosure offers stable passive cooling in humid subtropical climate': '高热容土体围护在湿热亚热带气候中提供稳定的被动降温',
+  'Balanced courtyard typology with strong seasonal adaptability in continental climate': '均衡的院落类型，在大陆性气候中具备很强的季节适应性',
+  'Exceptional thermal stability from ground coupling and low-material envelope': '地耦合与低材料围护带来卓越热稳定性',
+  'Highly resilient vernacular response to flood-prone humid mountain terrain': '对湿润山地易洪环境具有高度适应性的传统建造回应',
+  'Strong subtropical passive cooling logic combining enclosure and airflow control': '结合围护与气流控制的强亚热带被动降温逻辑',
+  'Best documented vernacular research case': '文献证据最充分的传统民居研究案例',
+  'Canal-edge climate logic but limited thermal mass': '具有滨水气候调节逻辑，但热容有限',
+  'Reliable cold-zone courtyard typology': '可靠的寒冷地区院落类型',
+  'Best cold-dry performer in the comparative ranking': '对比排名中表现最优的寒冷干燥类型',
+  'Best documented hot-humid passive system': '文献证据最充分的湿热气候被动系统',
+  'Good summer stability but unresolved rainy-season humidity': '夏季稳定性良好，但雨季湿度问题仍未完全解决',
+  'Best hot-dry passive package for extreme diurnal swing': '针对昼夜温差极端环境的最佳炎热干燥被动方案',
+  'Strong high-altitude passive strategy with rich field evidence': '高海拔被动策略强，且具有丰富实测证据',
+  'Highly climate-compatible typology in mild plateau context': '在温和高原气候中高度匹配的建筑类型',
+  'Strong severe-cold active-passive hybrid logic': '强烈严寒地区下主动-被动结合逻辑突出',
+  'High indoor humidity can persist during prolonged rainy periods': '连续雨季时室内高湿度可能持续存在',
+  'Urban densification can reduce courtyard ratio and passive performance': '城市加密会降低院落比例并削弱被动性能',
+  'Daylighting, moisture control, and seismic retrofit need modern intervention': '采光、防潮与抗震加固仍需现代技术介入',
+  'Timber durability and fire safety require contemporary detailing': '木构耐久性与防火仍需现代构造细化',
+  'Performance depends on courtyard upkeep and unobstructed wind paths': '性能依赖院落维护与不受阻的通风路径',
+  'High summer indoor RH around 83%': '夏季室内相对湿度可高达约 83%',
+  'High humidity and limited direct measurement': '湿度偏高且直接实测数据有限',
+  'Limited passive winter performance without Kang heating': '若无炕体供暖，冬季被动性能有限',
+  'Moisture vulnerability during prolonged wet periods': '长时间潮湿时段下易受潮',
+  'Humidity remains unavoidable in peak wet season': '在最潮湿季节仍难避免高湿环境',
+  'Indoor RH can reach 85-95% in rainy season': '雨季室内相对湿度可达 85–95%',
+  'Material maintenance burden in desert exposure': '荒漠暴露环境下材料维护负担较大',
+  'Winter comfort remains limited without supplemental heating': '若无辅助供暖，冬季舒适度仍有限',
+  'Limited direct measurement series in reviewed literature': '已审阅文献中的直接实测序列有限',
+  'Active winter heating is still required in deep cold': '深寒冬季仍需要主动供暖',
+  'Fujian Tulou and Earthen Construction': '福建土楼与夯土建造',
+  'Thermal mass and communal courtyards': '高热容围护与共享院落',
+  'Rammed Earth for Low-Carbon Buildings': '夯土在低碳建筑中的应用',
+  'Embodied carbon reductions vs concrete': '相较混凝土可降低隐含碳',
+  'Modern Earthen Community Hub': '现代夯土社区中心',
+  'Fujian': '福建',
+  'Hot-humid summer': '湿热夏季',
+  'Rammed-earth envelope + shaded court': '夯土围护 + 遮阴院落',
+  'Cooling load -22%': '制冷负荷 -22%',
+  'Circular Co-living Block': '环形共享居住单元',
+  'Xiamen': '厦门',
+  'Typhoon exposure': '台风暴露',
+  'Aerodynamic massing + reinforced shell': '气动体型 + 加强外壳',
+  'Wind resilience improved': '抗风韧性提升',
+  'Structure': '结构',
+  'Stabilized rammed earth + RC frame': '稳定夯土 + 钢筋混凝土框架',
+  'Fujian EarthTech + local lime': '福建 EarthTech + 本地石灰供应',
+  'Roof': '屋面',
+  'Clay tile + breathable membrane': '黏土瓦 + 可呼吸防水膜',
+  'Yongding tile workshops': '永定瓦作工坊',
+  'UNESCO WHC': '联合国教科文组织世界遗产中心',
+  'Journal of Green Building': '绿色建筑期刊',
+  'Tsinghua Architecture Review': '清华建筑评论',
+  'Energy & Buildings': '《Energy & Buildings》',
+  'Building and Environment': '《Building and Environment》',
+  'Passivhaus Institute Notes': '被动房研究所笔记',
+  'Regional Architecture Studies': '地域建筑研究',
+  'Sustainable Structures Journal': '可持续结构期刊',
+  'South China Vernacular Archive': '华南乡土建筑档案',
+  'Climate Responsive Design': '气候响应设计',
 }
 
-const deriveTempReduction = (internal: string, external: string, fallback: number): number => {
-  const internalValue = parseTemperatureValue(internal)
-  const externalValue = parseTemperatureValue(external)
-  if (internalValue === null || externalValue === null) {
-    return fallback
+const normalizeResearchText = (value: string): string => value.replace(/\s+/g, ' ').trim()
+
+const translateResearchText = (value: string | undefined, lang: 'zh' | 'en'): string => {
+  if (!value) return '—'
+  if (lang === 'en') return value
+
+  const normalizedValue = normalizeResearchText(value)
+  const directMatch = RESEARCH_ZH_LOOKUP[normalizedValue]
+  if (directMatch) return directMatch
+
+  let translated = normalizedValue
+  const sortedEntries = Object.entries(RESEARCH_ZH_LOOKUP).sort((a, b) => b[0].length - a[0].length)
+
+  for (const [englishText, chineseText] of sortedEntries) {
+    translated = translated.split(englishText).join(chineseText)
   }
 
-  return Math.max(0, Math.round(externalValue - internalValue))
+  return translated
+}
+
+const parseSignedNumbers = (value: string): number[] => {
+  const matches = value.match(/[-+]?\d+(?:\.\d+)?/g)
+  if (!matches) return []
+  return matches
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item))
+}
+
+const deriveCoolingDeltaFromSummer = (summerDelta?: string): number => {
+  if (!summerDelta) return 0
+  const values = parseSignedNumbers(summerDelta)
+  if (!values.length) return 0
+
+  const negativeMagnitudes = values
+    .filter((value) => value < 0)
+    .map((value) => Math.abs(value))
+  if (negativeMagnitudes.length) {
+    return Math.round(Math.max(...negativeMagnitudes))
+  }
+
+  return Math.round(Math.max(...values.map((value) => Math.abs(value))))
+}
+
+const formatThermalBufferValue = (entry: New10ResearchEntry | undefined, lang: 'zh' | 'en'): string => {
+  if (!entry) return '—'
+
+  const summerCooling = deriveCoolingDeltaFromSummer(entry.summerDelta)
+  const winterGain = deriveWinterGainFromDelta(entry.winterDelta)
+
+  if (summerCooling && winterGain) {
+    return lang === 'zh'
+      ? `夏-${summerCooling}°C / 冬+${winterGain}°C`
+      : `S -${summerCooling}°C / W +${winterGain}°C`
+  }
+
+  if (summerCooling) {
+    return lang === 'zh' ? `夏-${summerCooling}°C` : `${summerCooling}°C cooler`
+  }
+
+  if (winterGain) {
+    return lang === 'zh' ? `冬+${winterGain}°C` : `${winterGain}°C warmer`
+  }
+
+  return '—'
+}
+
+const formatHumidityRange = (value: string | undefined, lang: 'zh' | 'en'): string => {
+  if (!value) return '—'
+
+  const range = value.match(/\d+\s*(?:-\s*\d+)?%/)
+  if (range) {
+    return lang === 'zh'
+      ? `${range[0].replace(/\s+/g, '')} 相对湿度`
+      : `${range[0].replace(/\s+/g, '')} RH`
+  }
+
+  return translateResearchText(value, lang)
+}
+
+const summarizePassiveStrategy = (
+  primaryStrategy: string | undefined,
+  secondaryStrategy: string | undefined,
+  lang: 'zh' | 'en'
+): string => {
+  const combined = `${primaryStrategy ?? ''} ${secondaryStrategy ?? ''}`.toLowerCase()
+
+  if (combined.includes('earth-sheltered') || combined.includes('ground coupling')) {
+    return lang === 'zh' ? '覆土围护' : 'Earth-Sheltered'
+  }
+
+  if (combined.includes('rammed-earth') || combined.includes('thermal mass')) {
+    return lang === 'zh' ? '高热容围护' : 'Thermal Mass'
+  }
+
+  if (combined.includes('courtyard') && combined.includes('solar')) {
+    return lang === 'zh' ? '向阳院落' : 'Solar Courtyard'
+  }
+
+  if (combined.includes('stack')) {
+    return lang === 'zh' ? '烟囱通风' : 'Stack Vent.'
+  }
+
+  if (combined.includes('underfloor') || combined.includes('stilt')) {
+    return lang === 'zh' ? '架空通风' : 'Raised Vent.'
+  }
+
+  if (combined.includes('ventilation court')) {
+    return lang === 'zh' ? '通风庭院' : 'Ventilation Court'
+  }
+
+  if (combined.includes('shading') || combined.includes('eaves')) {
+    return lang === 'zh' ? '遮阳控制' : 'Shading Logic'
+  }
+
+  return lang === 'zh' ? '被动策略' : 'Passive Strategy'
+}
+
+const deriveWinterGainFromDelta = (winterDelta?: string): number => {
+  if (!winterDelta || /not directly measured/i.test(winterDelta)) return 0
+  const values = parseSignedNumbers(winterDelta)
+  if (!values.length) return 0
+
+  const positives = values.filter((value) => value > 0)
+  if (positives.length) {
+    return Math.round(Math.max(...positives))
+  }
+
+  return Math.round(Math.max(...values.map((value) => Math.abs(value))))
 }
 
 const DataHub = () => {
@@ -61,8 +306,7 @@ const DataHub = () => {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [isVisible, setIsVisible] = useState(false)
-  const [showAllBuildings, setShowAllBuildings] = useState(false)
-  const [selectedBuildingId, setSelectedBuildingId] = useState(BUILDING_PROFILES[0].id)
+  const [selectedBuildingId, setSelectedBuildingId] = useState<BuildingId>(BUILDING_PROFILES[0].id)
   const [analysisProfile] = useState<AnalysisProfile>({
     city: '',
     climateZone: '',
@@ -78,46 +322,131 @@ const DataHub = () => {
     return () => cancelAnimationFrame(timer)
   }, [])
 
-  // Building icon components with modern styling - imported from shared data
-
-  const familyDashboardMetrics: Record<string, { energy: number; carbon: number; comfort: number; tempReductionFallback: number }> = {
-    tulou: { energy: 85, carbon: 78, comfort: 82, tempReductionFallback: 13 },
-    siheyuan: { energy: 72, carbon: 70, comfort: 88, tempReductionFallback: 10 },
-    yaodong: { energy: 95, carbon: 92, comfort: 75, tempReductionFallback: 20 },
-    diaojiaolou: { energy: 68, carbon: 65, comfort: 85, tempReductionFallback: 6 },
-    weilongwu: { energy: 78, carbon: 75, comfort: 80, tempReductionFallback: 13 },
-  }
-
-  const buildings = BUILDING_PROFILES.map((profile) => {
-    const familyMetrics = familyDashboardMetrics[profile.family]
+  const buildings: Array<{
+    id: BuildingId
+    name: string
+    nameEn: string
+    family: (typeof BUILDING_PROFILES)[number]['family']
+    previewImage: string
+    tempReduction: number
+  }> = BUILDING_PROFILES.map((profile) => {
+    const research = NEW10_RESEARCH_BY_ID[profile.id]
     return {
       id: profile.id,
       name: lang === 'zh' ? profile.nameZh : profile.nameEn,
       nameEn: profile.nameEn,
       family: profile.family,
       previewImage: profile.previewImage,
-      energy: familyMetrics.energy,
-      carbon: familyMetrics.carbon,
-      comfort: familyMetrics.comfort,
-      tempReduction: deriveTempReduction(
-        profile.tempInternal,
-        profile.tempExternal,
-        familyMetrics.tempReductionFallback
-      ),
+      tempReduction: deriveCoolingDeltaFromSummer(research?.summerDelta),
     }
   })
 
-  const visibleBuildings = showAllBuildings ? buildings : buildings.slice(0, 5)
   const selectedBuilding = buildings.find((b) => b.id === selectedBuildingId) ?? buildings[0]
   const selectedResearch = selectedBuilding ? NEW10_RESEARCH_BY_ID[selectedBuilding.id] : undefined
 
+  const maxTempReduction = useMemo(
+    () => Math.max(...buildings.map((item) => item.tempReduction), 1),
+    [buildings]
+  )
+
+  const dynamicRankById = useMemo(() => {
+    const rows: Array<{
+      id: string
+      climateFit: number
+      carbon: number
+      summerCooling: number
+      winterGain: number
+    }> = []
+
+    for (const profile of BUILDING_PROFILES) {
+      const research = NEW10_RESEARCH_BY_ID[profile.id]
+      if (!research) continue
+
+      rows.push({
+        id: profile.id,
+        climateFit: research.climateFitStars,
+        carbon: research.carbonEfficiencyStars,
+        summerCooling: deriveCoolingDeltaFromSummer(research.summerDelta),
+        winterGain: deriveWinterGainFromDelta(research.winterDelta),
+      })
+    }
+
+    if (!rows.length) return {} as Record<string, number>
+
+    const maxSummerCooling = Math.max(...rows.map((row) => row.summerCooling), 1)
+    const maxWinterGain = Math.max(...rows.map((row) => row.winterGain), 1)
+
+    const ranked = rows
+      .map((row) => {
+        const normalizedSummer = (row.summerCooling / maxSummerCooling) * 5
+        const normalizedWinter = (row.winterGain / maxWinterGain) * 5
+        const score =
+          row.climateFit * 0.4 +
+          row.carbon * 0.35 +
+          normalizedSummer * 0.2 +
+          normalizedWinter * 0.05
+        return { ...row, score }
+      })
+      .sort((a, b) => b.score - a.score)
+
+    const rankMap: Record<string, number> = {}
+    ranked.forEach((row, index) => {
+      rankMap[row.id] = index + 1
+    })
+
+    return rankMap
+  }, [])
+
+  const selectedRank = selectedResearch ? dynamicRankById[selectedResearch.id] : undefined
+
   
-  const climateData = [
-    { label: lang === 'zh' ? '温度稳定性' : 'Temperature Stability', value: lang === 'zh' ? '显著改善' : 'Significant', icon: ThermometerSun, color: 'var(--temp-hot)', note: lang === 'zh' ? '研究表明窑洞冬季室温可达8-12°C' : 'Studies show cave dwellings maintain 8-12°C in winter' },
-    { label: lang === 'zh' ? '湿度调节' : 'Humidity Control', value: lang === 'zh' ? '因地而异' : 'Varies', icon: Droplets, color: 'var(--info)', note: lang === 'zh' ? '南方传统民居室内湿度约53-83%' : 'Southern residences show 53-83% indoor humidity' },
-    { label: lang === 'zh' ? '自然通风' : 'Natural Ventilation', value: lang === 'zh' ? '核心策略' : 'Key Strategy', icon: Wind, color: 'var(--temp-cool)', note: lang === 'zh' ? '院落与烟囱效应是主要通风手段' : 'Courtyard and stack effect are primary ventilation methods' },
-    { label: lang === 'zh' ? '能源效益' : 'Energy Benefits', value: lang === 'zh' ? '有据可查' : 'Documented', icon: Leaf, color: 'var(--brand-primary)', note: lang === 'zh' ? '被动式设计可显著降低能耗' : 'Passive design significantly reduces energy demand' },
-  ]
+  const climateData = useMemo(
+    () => [
+      {
+        label: lang === 'zh' ? '温度缓冲' : 'Thermal Buffer',
+        value: formatThermalBufferValue(selectedResearch, lang),
+        icon: ThermometerSun,
+        color: 'var(--temp-hot)',
+        note: selectedResearch
+          ? (lang === 'zh'
+            ? `夏季 ${translateResearchText(selectedResearch.summerDelta, lang)}；冬季 ${translateResearchText(selectedResearch.winterDelta, lang)}`
+            : `Summer: ${selectedResearch.summerDelta}; Winter: ${selectedResearch.winterDelta}`)
+          : (lang === 'zh' ? '暂无研究数据' : 'Research data unavailable'),
+      },
+      {
+        label: lang === 'zh' ? '湿度范围' : 'Humidity Range',
+        value: formatHumidityRange(selectedResearch?.relativeHumidity, lang),
+        icon: Droplets,
+        color: 'var(--info)',
+        note: selectedResearch
+          ? (lang === 'zh'
+            ? `研究湿度区间 · ${translateResearchText(selectedResearch.chineseClimateZone, lang)}`
+            : `Research humidity range · ${selectedResearch.chineseClimateZone}`)
+          : (lang === 'zh' ? '暂无研究数据' : 'Research data unavailable'),
+      },
+      {
+        label: lang === 'zh' ? '被动策略' : 'Passive Strategy',
+        value: summarizePassiveStrategy(selectedResearch?.primaryStrategy, selectedResearch?.secondaryStrategy, lang),
+        icon: Wind,
+        color: 'var(--temp-cool)',
+        note: selectedResearch
+          ? translateResearchText(selectedResearch.secondaryStrategy ?? selectedResearch.primaryStrategy, lang)
+          : (lang === 'zh' ? '暂无研究数据' : 'Research data unavailable'),
+      },
+      {
+        label: lang === 'zh' ? '碳效率' : 'Carbon Efficiency',
+        value: selectedResearch ? `${selectedResearch.carbonEfficiencyStars}/5` : '—',
+        icon: Leaf,
+        color: 'var(--brand-primary)',
+        note: selectedResearch
+          ? (lang === 'zh'
+            ? `排名 #${selectedRank ?? selectedResearch.overallRank} · 气候匹配 ${selectedResearch.climateFitStars}/5`
+            : `Rank #${selectedRank ?? selectedResearch.overallRank} · Climate fit ${selectedResearch.climateFitStars}/5`)
+          : (lang === 'zh' ? '暂无研究数据' : 'Research data unavailable'),
+      },
+    ],
+    [lang, selectedRank, selectedResearch]
+  )
 
   const areaM2 = useMemo(() => parseAreaFromText(analysisProfile.landSize), [analysisProfile.landSize])
   const buildingFamily = useMemo(
@@ -125,37 +454,10 @@ const DataHub = () => {
     [selectedBuilding, analysisProfile.buildingType]
   )
 
-  const carbonStats = useMemo(() => {
-    const embodiedBaselineFactor = 520
-    const embodiedReductionMap: Record<string, number> = {
-      tulou: 0.26,
-      siheyuan: 0.21,
-      yaodong: 0.31,
-      diaojiaolou: 0.28,
-      weilongwu: 0.23,
-    }
-    const operationalBaselineFactor = 68
-    const operationalReductionMap: Record<string, number> = {
-      tulou: 0.24,
-      siheyuan: 0.2,
-      yaodong: 0.34,
-      diaojiaolou: 0.27,
-      weilongwu: 0.22,
-    }
-    const embodiedBaseline = Math.round((areaM2 * embodiedBaselineFactor) / 1000)
-    const embodiedSaved = Math.round(embodiedBaseline * embodiedReductionMap[buildingFamily])
-    const annualOperationalBaseline = Math.round((areaM2 * operationalBaselineFactor) / 1000)
-    const annualOperationalSaved = Math.round(annualOperationalBaseline * operationalReductionMap[buildingFamily])
-
-    return {
-      embodiedBaseline,
-      embodiedSaved,
-      embodiedSavedPct: Math.round((embodiedSaved / Math.max(embodiedBaseline, 1)) * 100),
-      annualOperationalBaseline,
-      annualOperationalSaved,
-      annualOperationalSavedPct: Math.round((annualOperationalSaved / Math.max(annualOperationalBaseline, 1)) * 100),
-    }
-  }, [areaM2, buildingFamily])
+  const carbonStats = useMemo(
+    () => computeCarbonProfile(areaM2, buildingFamily),
+    [areaM2, buildingFamily]
+  )
 
   const passiveStrategies = useMemo(() => {
     const map: Record<string, Array<{ title: string; impact: string; value: string }>> = {
@@ -202,8 +504,18 @@ const DataHub = () => {
   const sourceLinkedCards = useMemo<SourceItem[]>(() => {
     const sourceMap: Record<string, SourceItem[]> = {
       tulou: [
-        { title: 'Fujian Tulou and Earthen Construction', publisher: 'UNESCO WHC', year: '2008', note: 'Thermal mass and communal courtyards' },
-        { title: 'Rammed Earth for Low-Carbon Buildings', publisher: 'Journal of Green Building', year: '2022', note: 'Embodied carbon reductions vs concrete' },
+        {
+          title: lang === 'zh' ? '福建土楼与夯土建造' : 'Fujian Tulou and Earthen Construction',
+          publisher: 'UNESCO WHC',
+          year: '2008',
+          note: lang === 'zh' ? '高热容围护与共享院落' : 'Thermal mass and communal courtyards'
+        },
+        {
+          title: lang === 'zh' ? '夯土在低碳建筑中的应用' : 'Rammed Earth for Low-Carbon Buildings',
+          publisher: 'Journal of Green Building',
+          year: '2022',
+          note: lang === 'zh' ? '相较混凝土可降低隐含碳' : 'Embodied carbon reductions vs concrete'
+        },
       ],
       siheyuan: [
         {
@@ -220,16 +532,46 @@ const DataHub = () => {
         },
       ],
       yaodong: [
-        { title: 'Thermal Behavior of Cave Dwellings', publisher: 'Building and Environment', year: '2020', note: 'Stable indoor temperatures via earth sheltering' },
-        { title: 'Earth-Covered Housing and Energy Performance', publisher: 'Passivhaus Institute Notes', year: '2022', note: 'Low HVAC dependence' },
+        {
+          title: lang === 'zh' ? '窑洞居住空间的热环境表现' : 'Thermal Behavior of Cave Dwellings',
+          publisher: 'Building and Environment',
+          year: '2020',
+          note: lang === 'zh' ? '依靠覆土实现稳定室内温度' : 'Stable indoor temperatures via earth sheltering'
+        },
+        {
+          title: lang === 'zh' ? '覆土住宅与能源性能' : 'Earth-Covered Housing and Energy Performance',
+          publisher: 'Passivhaus Institute Notes',
+          year: '2022',
+          note: lang === 'zh' ? '对 HVAC 系统依赖较低' : 'Low HVAC dependence'
+        },
       ],
       diaojiaolou: [
-        { title: 'Vernacular Stilted Housing in Southwest China', publisher: 'Regional Architecture Studies', year: '2021', note: 'Flood resilience and ventilation' },
-        { title: 'Timber Elevated Structures in Humid Climates', publisher: 'Sustainable Structures Journal', year: '2023', note: 'Moisture and durability response' },
+        {
+          title: lang === 'zh' ? '中国西南地区传统吊脚居住建筑' : 'Vernacular Stilted Housing in Southwest China',
+          publisher: 'Regional Architecture Studies',
+          year: '2021',
+          note: lang === 'zh' ? '防洪韧性与通风表现' : 'Flood resilience and ventilation'
+        },
+        {
+          title: lang === 'zh' ? '湿润气候中的木质架空结构' : 'Timber Elevated Structures in Humid Climates',
+          publisher: 'Sustainable Structures Journal',
+          year: '2023',
+          note: lang === 'zh' ? '应对潮湿与耐久性问题' : 'Moisture and durability response'
+        },
       ],
       weilongwu: [
-        { title: 'Hakka Walled Enclosures and Microclimate', publisher: 'South China Vernacular Archive', year: '2019', note: 'Semi-enclosed massing and airflow' },
-        { title: 'Courtyard Cooling and Urban Heat Mitigation', publisher: 'Climate Responsive Design', year: '2022', note: 'Cooling courtyards and water bodies' },
+        {
+          title: lang === 'zh' ? '客家围合建筑与微气候' : 'Hakka Walled Enclosures and Microclimate',
+          publisher: 'South China Vernacular Archive',
+          year: '2019',
+          note: lang === 'zh' ? '半围合体量与气流组织' : 'Semi-enclosed massing and airflow'
+        },
+        {
+          title: lang === 'zh' ? '院落降温与城市热缓解' : 'Courtyard Cooling and Urban Heat Mitigation',
+          publisher: 'Climate Responsive Design',
+          year: '2022',
+          note: lang === 'zh' ? '降温院落与水体调节' : 'Cooling courtyards and water bodies'
+        },
       ],
     }
     return sourceMap[buildingFamily]
@@ -238,8 +580,20 @@ const DataHub = () => {
   const benchmarkCases = useMemo<CaseItem[]>(() => {
     const map: Record<string, CaseItem[]> = {
       tulou: [
-        { name: 'Modern Earthen Community Hub', location: 'Fujian', challenge: 'Hot-humid summer', strategy: 'Rammed-earth envelope + shaded court', outcome: 'Cooling load -22%' },
-        { name: 'Circular Co-living Block', location: 'Xiamen', challenge: 'Typhoon exposure', strategy: 'Aerodynamic massing + reinforced shell', outcome: 'Wind resilience improved' },
+        {
+          name: lang === 'zh' ? '现代夯土社区中心' : 'Modern Earthen Community Hub',
+          location: lang === 'zh' ? '福建' : 'Fujian',
+          challenge: lang === 'zh' ? '湿热夏季' : 'Hot-humid summer',
+          strategy: lang === 'zh' ? '夯土围护 + 遮阴院落' : 'Rammed-earth envelope + shaded court',
+          outcome: lang === 'zh' ? '制冷负荷 -22%' : 'Cooling load -22%'
+        },
+        {
+          name: lang === 'zh' ? '环形共享居住单元' : 'Circular Co-living Block',
+          location: lang === 'zh' ? '厦门' : 'Xiamen',
+          challenge: lang === 'zh' ? '台风暴露' : 'Typhoon exposure',
+          strategy: lang === 'zh' ? '气动体型 + 加强外壳' : 'Aerodynamic massing + reinforced shell',
+          outcome: lang === 'zh' ? '抗风韧性提升' : 'Wind resilience improved'
+        },
       ],
       siheyuan: [
         {
@@ -258,16 +612,52 @@ const DataHub = () => {
         },
       ],
       yaodong: [
-        { name: 'Earth-Sheltered School', location: 'Shaanxi', challenge: 'Large diurnal swing', strategy: 'Earth berm + thermal buffer', outcome: 'HVAC demand -31%' },
-        { name: 'Loess Plateau Visitor Center', location: 'Yan\'an', challenge: 'Dry heat and winter cold', strategy: 'Semi-buried massing', outcome: 'Annual energy -28%' },
+        {
+          name: lang === 'zh' ? '覆土学校建筑' : 'Earth-Sheltered School',
+          location: lang === 'zh' ? '陕西' : 'Shaanxi',
+          challenge: lang === 'zh' ? '昼夜温差大' : 'Large diurnal swing',
+          strategy: lang === 'zh' ? '覆土缓坡 + 热缓冲层' : 'Earth berm + thermal buffer',
+          outcome: lang === 'zh' ? 'HVAC 需求 -31%' : 'HVAC demand -31%'
+        },
+        {
+          name: lang === 'zh' ? '黄土高原游客中心' : 'Loess Plateau Visitor Center',
+          location: lang === 'zh' ? '延安' : 'Yan\'an',
+          challenge: lang === 'zh' ? '干热夏季与寒冷冬季' : 'Dry heat and winter cold',
+          strategy: lang === 'zh' ? '半埋式体量' : 'Semi-buried massing',
+          outcome: lang === 'zh' ? '全年能耗 -28%' : 'Annual energy -28%'
+        },
       ],
       diaojiaolou: [
-        { name: 'Raised Timber Health Clinic', location: 'Guizhou', challenge: 'Flood and humidity', strategy: 'Elevated floor + cross ventilation', outcome: 'Moisture incidents reduced' },
-        { name: 'Slope-Adapted Community Hall', location: 'Yunnan', challenge: 'Steep terrain', strategy: 'Stilted structure + roof drainage', outcome: 'Lower earthwork impact' },
+        {
+          name: lang === 'zh' ? '架空木结构卫生站' : 'Raised Timber Health Clinic',
+          location: lang === 'zh' ? '贵州' : 'Guizhou',
+          challenge: lang === 'zh' ? '洪涝与潮湿' : 'Flood and humidity',
+          strategy: lang === 'zh' ? '抬升地板 + 交叉通风' : 'Elevated floor + cross ventilation',
+          outcome: lang === 'zh' ? '受潮问题减少' : 'Moisture incidents reduced'
+        },
+        {
+          name: lang === 'zh' ? '适应坡地的社区礼堂' : 'Slope-Adapted Community Hall',
+          location: lang === 'zh' ? '云南' : 'Yunnan',
+          challenge: lang === 'zh' ? '地形陡峭' : 'Steep terrain',
+          strategy: lang === 'zh' ? '吊脚结构 + 屋面排水' : 'Stilted structure + roof drainage',
+          outcome: lang === 'zh' ? '土方影响更低' : 'Lower earthwork impact'
+        },
       ],
       weilongwu: [
-        { name: 'Subtropical Courtyard Housing', location: 'Guangdong', challenge: 'Heat and humidity', strategy: 'Semi-enclosure + cooling court', outcome: 'Peak heat gain -18%' },
-        { name: 'Heritage-Inspired Campus Block', location: 'Shenzhen', challenge: 'UHI stress', strategy: 'Ventilation spine + shaded arcades', outcome: 'Outdoor comfort improved' },
+        {
+          name: lang === 'zh' ? '亚热带院落住宅' : 'Subtropical Courtyard Housing',
+          location: lang === 'zh' ? '广东' : 'Guangdong',
+          challenge: lang === 'zh' ? '高温与高湿' : 'Heat and humidity',
+          strategy: lang === 'zh' ? '半围合布局 + 冷却庭院' : 'Semi-enclosure + cooling court',
+          outcome: lang === 'zh' ? '峰值得热 -18%' : 'Peak heat gain -18%'
+        },
+        {
+          name: lang === 'zh' ? '遗产启发式校园组团' : 'Heritage-Inspired Campus Block',
+          location: lang === 'zh' ? '深圳' : 'Shenzhen',
+          challenge: lang === 'zh' ? '城市热岛压力' : 'UHI stress',
+          strategy: lang === 'zh' ? '通风廊脊 + 遮阴骑楼' : 'Ventilation spine + shaded arcades',
+          outcome: lang === 'zh' ? '室外舒适度提升' : 'Outdoor comfort improved'
+        },
       ],
     }
     return map[buildingFamily]
@@ -276,8 +666,18 @@ const DataHub = () => {
   const supplierRows = useMemo<SupplierItem[]>(() => {
     const base: Record<string, SupplierItem[]> = {
       tulou: [
-        { component: 'Structure', material: 'Stabilized rammed earth + RC frame', unitCost: '¥850/m²', supplier: 'Fujian EarthTech + local lime' },
-        { component: 'Roof', material: 'Clay tile + breathable membrane', unitCost: '¥150/m²', supplier: 'Yongding tile workshops' },
+        {
+          component: lang === 'zh' ? '结构' : 'Structure',
+          material: lang === 'zh' ? '稳定夯土 + 钢筋混凝土框架' : 'Stabilized rammed earth + RC frame',
+          unitCost: '¥850/m²',
+          supplier: lang === 'zh' ? '福建 EarthTech + 本地石灰供应' : 'Fujian EarthTech + local lime'
+        },
+        {
+          component: lang === 'zh' ? '屋面' : 'Roof',
+          material: lang === 'zh' ? '黏土瓦 + 可呼吸防水膜' : 'Clay tile + breathable membrane',
+          unitCost: '¥150/m²',
+          supplier: lang === 'zh' ? '永定瓦作工坊' : 'Yongding tile workshops'
+        },
       ],
       siheyuan: [
         {
@@ -294,16 +694,46 @@ const DataHub = () => {
         },
       ],
       yaodong: [
-        { component: 'Envelope', material: 'Earth-bermed concrete shell', unitCost: '¥980/m²', supplier: 'Shaanxi GeoBuild' },
-        { component: 'Interior', material: 'CLT fit-out', unitCost: '¥1,400/m³', supplier: 'Western China timber network' },
+        {
+          component: lang === 'zh' ? '围护' : 'Envelope',
+          material: lang === 'zh' ? '覆土混凝土壳体' : 'Earth-bermed concrete shell',
+          unitCost: '¥980/m²',
+          supplier: lang === 'zh' ? '陕西 GeoBuild' : 'Shaanxi GeoBuild'
+        },
+        {
+          component: lang === 'zh' ? '室内' : 'Interior',
+          material: lang === 'zh' ? 'CLT 室内装配' : 'CLT fit-out',
+          unitCost: '¥1,400/m³',
+          supplier: lang === 'zh' ? '中国西部木材供应网络' : 'Western China timber network'
+        },
       ],
       diaojiaolou: [
-        { component: 'Structure', material: 'Glulam/steel hybrid stilt frame', unitCost: '¥1,260/m³', supplier: 'Guizhou Timber Alliance' },
-        { component: 'Floor', material: 'Ventilated composite decking', unitCost: '¥380/m²', supplier: 'Yunnan resilient housing suppliers' },
+        {
+          component: lang === 'zh' ? '结构' : 'Structure',
+          material: lang === 'zh' ? '胶合木/钢混合吊脚框架' : 'Glulam/steel hybrid stilt frame',
+          unitCost: '¥1,260/m³',
+          supplier: lang === 'zh' ? '贵州木构产业联盟' : 'Guizhou Timber Alliance'
+        },
+        {
+          component: lang === 'zh' ? '楼板' : 'Floor',
+          material: lang === 'zh' ? '通风复合地板' : 'Ventilated composite decking',
+          unitCost: '¥380/m²',
+          supplier: lang === 'zh' ? '云南韧性住宅供应商' : 'Yunnan resilient housing suppliers'
+        },
       ],
       weilongwu: [
-        { component: 'Walls', material: 'High-thermal-mass masonry', unitCost: '¥760/m²', supplier: 'Guangdong local masonry yards' },
-        { component: 'Cooling Court', material: 'Bioretention and permeable paving', unitCost: '¥240/m²', supplier: 'Pearl River landscape suppliers' },
+        {
+          component: lang === 'zh' ? '墙体' : 'Walls',
+          material: lang === 'zh' ? '高热容砌体' : 'High-thermal-mass masonry',
+          unitCost: '¥760/m²',
+          supplier: lang === 'zh' ? '广东本地砌体材料场' : 'Guangdong local masonry yards'
+        },
+        {
+          component: lang === 'zh' ? '冷却庭院' : 'Cooling Court',
+          material: lang === 'zh' ? '生物滞留设施与透水铺装' : 'Bioretention and permeable paving',
+          unitCost: '¥240/m²',
+          supplier: lang === 'zh' ? '珠江流域景观供应商' : 'Pearl River landscape suppliers'
+        },
       ],
     }
     return base[buildingFamily]
@@ -330,6 +760,92 @@ const DataHub = () => {
           <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
             {lang === 'zh' ? '基于实测数据的传统建筑气候适应性能分析' : 'Climate adaptation performance analysis based on measured data'}
           </p>
+        </div>
+
+        {/* Compact Building Selector */}
+        <div className={`modern-card rounded-2xl p-5 mb-6 transition-all duration-700 delay-150 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <h2 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Building2 size={18} style={{ color: 'var(--brand-primary)' }} />
+              {lang === 'zh' ? '建筑选择' : 'Building Selector'}
+            </h2>
+            <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+              {lang === 'zh' ? '点击图片切换全部数据' : 'Click a photo to update all data'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 xl:grid-cols-8 gap-2.5">
+            {buildings.map((building, idx) => {
+              const iconGradient = buildingIcons[building.id].gradient
+              const reductionPercent = (building.tempReduction / maxTempReduction) * 100
+              const isSelected = selectedBuildingId === building.id
+              const buildingRank = dynamicRankById[building.id]
+
+              return (
+                <button
+                  type="button"
+                  key={building.id}
+                  className="text-left group"
+                  style={{ animationDelay: `${idx * 40}ms` }}
+                  onClick={() => setSelectedBuildingId(building.id)}
+                >
+                  <div
+                    className="relative aspect-[4/3] rounded-xl overflow-hidden transition-all duration-300"
+                    style={{
+                      backgroundColor: 'var(--bg-secondary)',
+                      boxShadow: isSelected ? '0 10px 24px rgba(0,0,0,0.16)' : '0 4px 16px rgba(0,0,0,0.08)',
+                      border: isSelected ? '2px solid var(--brand-primary)' : '1px solid var(--border-light)',
+                      transform: isSelected ? 'translateY(-2px)' : undefined,
+                    }}
+                  >
+                    <img
+                      src={building.previewImage}
+                      alt={building.nameEn}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.45) 100%)' }}
+                    />
+                    <div
+                      className="absolute left-2 top-2 text-[10px] px-2 py-1 rounded-full font-semibold"
+                      style={{
+                        backgroundColor: isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255,255,255,0.92)',
+                        color: isDark ? 'rgba(255,255,255,0.96)' : 'var(--text-primary)',
+                        border: isDark ? '1px solid rgba(255,255,255,0.14)' : '1px solid rgba(15,23,42,0.06)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.16)'
+                      }}
+                    >
+                      #{buildingRank ?? '—'}
+                    </div>
+                    <div
+                      className="absolute right-2 bottom-2 text-[10px] px-2 py-1 rounded-full font-semibold text-white"
+                      style={{ background: iconGradient }}
+                    >
+                      ↓{building.tempReduction}°C
+                    </div>
+                  </div>
+
+                  <div className="mt-2 px-1">
+                    <div
+                      className="text-[11px] font-semibold leading-snug line-clamp-2"
+                      style={{ color: isSelected ? 'var(--brand-primary)' : 'var(--text-primary)' }}
+                    >
+                      {building.name}
+                    </div>
+                    <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${reductionPercent}%`, background: iconGradient }}
+                      />
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Key Stats Overview */}
@@ -432,9 +948,9 @@ const DataHub = () => {
             <div className="space-y-2">
               {sourceLinkedCards.map((s, idx) => (
                 <div key={`${s.title}-${idx}`} className="rounded-lg p-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{s.title}</div>
-                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.publisher} • {s.year}</div>
-                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{s.note}</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{translateResearchText(s.title, lang)}</div>
+                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{translateResearchText(s.publisher, lang)} • {s.year}</div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{translateResearchText(s.note, lang)}</div>
                   {s.url && (
                     <a
                       href={s.url}
@@ -459,9 +975,9 @@ const DataHub = () => {
             <div className="space-y-2">
               {benchmarkCases.map((c, idx) => (
                 <div key={`${c.name}-${idx}`} className="rounded-lg p-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{c.name}</div>
-                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{c.location} • {c.challenge}</div>
-                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{c.strategy}{' -> '}{c.outcome}</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{translateResearchText(c.name, lang)}</div>
+                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{translateResearchText(c.location, lang)} • {translateResearchText(c.challenge, lang)}</div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{translateResearchText(c.strategy, lang)}{' -> '}{translateResearchText(c.outcome, lang)}</div>
                 </div>
               ))}
             </div>
@@ -475,9 +991,9 @@ const DataHub = () => {
             <div className="space-y-2">
               {supplierRows.map((s, idx) => (
                 <div key={`${s.component}-${idx}`} className="rounded-lg p-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{s.component}: {s.material}</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{translateResearchText(s.component, lang)}: {translateResearchText(s.material, lang)}</div>
                   <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.unitCost}</div>
-                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{s.supplier}</div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{translateResearchText(s.supplier, lang)}</div>
                 </div>
               ))}
             </div>
@@ -525,134 +1041,33 @@ const DataHub = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-5">
-            {visibleBuildings.map((building, idx) => {
-              const iconGradient = buildingIcons[building.id].gradient
-              const maxReduction = 20
-              const reductionPercent = (building.tempReduction / maxReduction) * 100
-              const isSelected = selectedBuildingId === building.id
-              
-              return (
-                <div 
-                  key={building.id} 
-                  className="text-center stagger-item group cursor-pointer" 
-                  style={{
-                    animationDelay: `${idx * 100}ms`,
-                    transform: isSelected ? 'translateY(-2px)' : undefined,
-                  }}
-                  onClick={() => setSelectedBuildingId(building.id)}
-                >
-                  {/* Icon Container with Glow Effect */}
-                  <div className="relative mb-4">
-                    <div 
-                      className="w-full aspect-square rounded-2xl flex items-center justify-center transition-all duration-500 cursor-pointer relative overflow-hidden"
-                      style={{ 
-                        backgroundColor: 'var(--bg-secondary)',
-                        boxShadow: isSelected ? '0 12px 28px rgba(0,0,0,0.18)' : '0 8px 32px rgba(0,0,0,0.12)',
-                        border: isSelected ? '2px solid var(--brand-primary)' : '1px solid var(--border-light)'
-                      }}
-                    >
-                      <img
-                        src={building.previewImage}
-                        alt={building.nameEn}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      />
-
-                      <div
-                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                        style={{
-                          background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.35) 100%)'
-                        }}
-                      />
- 
-                      {/* Hover Ring Effect */}
-                      <div 
-                        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-500"
-                        style={{
-                          boxShadow: 'inset 0 0 20px rgba(255,255,255,0.3)'
-                        }}
-                      />
-                    </div>
-                    
-                    {/* Temperature Badge */}
-                    <div 
-                      className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold shadow-lg transition-all duration-300 group-hover:scale-110"
-                      style={{ 
-                        background: building.tempReduction >= 15 ? 'var(--temp-cool)' : building.tempReduction >= 10 ? 'var(--info)' : 'var(--brand-primary)',
-                        color: 'white'
-                      }}
-                    >
-                      ↓{building.tempReduction}°C
-                    </div>
-                  </div>
-                  
-                  {/* Building Name */}
-                  <div 
-                    className="font-semibold text-sm mb-2 transition-colors duration-300 group-hover:text-(--brand-primary)" 
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    {building.name}
-                  </div>
-                  
-                  {/* Mini Progress Bar */}
-                  <div 
-                    className="h-1.5 rounded-full overflow-hidden mx-auto"
-                    style={{ 
-                      backgroundColor: 'var(--bg-secondary)',
-                      width: '80%'
-                    }}
-                  >
-                    <div 
-                      className="h-full rounded-full transition-all duration-1000 ease-out"
-                      style={{ 
-                        width: `${reductionPercent}%`,
-                        background: iconGradient
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Efficiency Label */}
-                  <div 
-                    className="text-[10px] mt-2 font-medium"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    {building.tempReduction >= 15 
-                      ? (lang === 'zh' ? '卓越' : 'Excellent')
-                      : building.tempReduction >= 10 
-                        ? (lang === 'zh' ? '优秀' : 'Great')
-                        : (lang === 'zh' ? '良好' : 'Good')
-                    }
-                  </div>
-                  {isSelected && (
-                    <div className="text-[10px] mt-1 font-semibold" style={{ color: 'var(--brand-primary)' }}>
-                      {lang === 'zh' ? '已选择' : 'Selected'}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {buildings.length > 5 && (
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setShowAllBuildings((prev) => !prev)}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-                style={{
-                  backgroundColor: 'var(--brand-primary)',
-                  color: 'white',
-                  boxShadow: '0 8px 22px rgba(0,0,0,0.14)'
-                }}
-              >
-                {showAllBuildings
-                  ? (lang === 'zh' ? '收起建筑' : 'Show Less')
-                  : (lang === 'zh' ? '更多建筑' : 'More Buildings')}
-              </button>
+          <div
+            className="mb-6 rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap"
+            style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border-default)' }}
+          >
+            <div>
+              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{selectedBuilding?.name}</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {lang === 'zh'
+                  ? '当前数据由上方建筑缩略图切换'
+                  : 'This data changes with the building thumbnails above'}
+              </div>
             </div>
-          )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className="text-xs px-2 py-1 rounded-full"
+                style={{ backgroundColor: 'var(--brand-primary-glow)', color: 'var(--brand-primary)' }}
+              >
+                #{selectedRank ?? selectedResearch?.overallRank ?? '—'}
+              </span>
+              <span
+                className="text-xs px-2 py-1 rounded-full"
+                style={{ backgroundColor: 'var(--temp-cool-light)', color: 'var(--temp-cool)' }}
+              >
+                ↓{selectedBuilding?.tempReduction ?? 0}°C
+              </span>
+            </div>
+          </div>
 
           {selectedResearch && (
             <div
@@ -667,15 +1082,15 @@ const DataHub = () => {
                   className="text-xs px-2 py-1 rounded-full"
                   style={{ backgroundColor: 'var(--brand-primary-glow)', color: 'var(--brand-primary)' }}
                 >
-                  #{selectedResearch.overallRank}
+                  #{selectedRank ?? selectedResearch.overallRank}
                 </span>
               </div>
               <div className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
-                {selectedResearch.primaryStrategy}
+                {translateResearchText(selectedResearch.primaryStrategy, lang)}
               </div>
               <div className="grid sm:grid-cols-2 gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                <div>{lang === 'zh' ? '夏季温差' : 'Summer Delta'}: {selectedResearch.summerDelta}</div>
-                <div>{lang === 'zh' ? '冬季温差' : 'Winter Delta'}: {selectedResearch.winterDelta}</div>
+                <div>{lang === 'zh' ? '夏季温差' : 'Summer Delta'}: {translateResearchText(selectedResearch.summerDelta, lang)}</div>
+                <div>{lang === 'zh' ? '冬季温差' : 'Winter Delta'}: {translateResearchText(selectedResearch.winterDelta, lang)}</div>
                 <div>{lang === 'zh' ? '气候匹配' : 'Climate Fit'}: {selectedResearch.climateFitStars}/5</div>
                 <div>{lang === 'zh' ? '碳效率' : 'Carbon Efficiency'}: {selectedResearch.carbonEfficiencyStars}/5</div>
               </div>
@@ -708,11 +1123,11 @@ const DataHub = () => {
               <div className="flex-1">
                 <h4 className="text-white font-bold mb-1 flex items-center gap-2">
                   <Sparkles size={16} className="text-yellow-300" />
-                  {selectedBuilding?.name || 'Building'}
+                  {selectedBuilding?.name || (lang === 'zh' ? '建筑' : 'Building')}
                 </h4>
                 <p className="text-white/80 text-sm leading-relaxed">
                   {selectedResearch
-                    ? `${selectedResearch.overallSummary}. ${lang === 'zh' ? '关键限制' : 'Key limitation'}: ${selectedResearch.keyLimitation}.`
+                    ? `${translateResearchText(selectedResearch.overallSummary, lang)}。${lang === 'zh' ? '关键限制' : 'Key limitation'}: ${translateResearchText(selectedResearch.keyLimitation, lang)}${lang === 'zh' ? '。' : '.'}`
                     : (lang === 'zh'
                       ? '该建筑目前没有文档提取研究条目，可继续使用通用数据分析。'
                       : 'No extracted document record is available for this building yet; general analytics are still applied.')}
@@ -723,7 +1138,7 @@ const DataHub = () => {
             {/* Stats Row */}
             <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-white/20">
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">{selectedResearch ? `#${selectedResearch.overallRank}` : '-'}</div>
+                <div className="text-2xl font-bold text-white">{selectedResearch ? `#${selectedRank ?? selectedResearch.overallRank}` : '-'}</div>
                 <div className="text-xs text-white/60">{lang === 'zh' ? '综合排名' : 'Overall Rank'}</div>
               </div>
               <div className="text-center">
